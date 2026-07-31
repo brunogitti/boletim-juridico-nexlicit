@@ -1,0 +1,20 @@
+# Ambiente virtual do Python.
+venv/
+.venv/
+
+# Segredos (chave de API, credenciais de e-mail).
+.env
+
+# Banco de dados local (SQLite). Vive na branch "data", não na principal.
+*.db
+
+# Arquivos que o Python cria sozinho.
+__pycache__/
+*.pyc
+
+# Cache e artefatos de teste.
+.pytest_cache/
+
+# Configuração local do Claude Code (ferramenta de IA usada no
+# desenvolvimento), não faz parte do projeto.
+.claude/
