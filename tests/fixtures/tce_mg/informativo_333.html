@@ -1,0 +1,57 @@
+<!--
+Fixture de teste: recorte real de
+https://www.tce.mg.gov.br/Informativo-de-Jurisprudencia-n-333.html/Noticia/1111628977
+(a mesma URL do exemplo original), capturado em 2026-08-04. Markup
+simplificado pra legibilidade (o HTML real vem de um editor tipo Word
+Online, com dezenas de <span> aninhados por palavra — já testamos que o
+desembrulhador aguenta esse tipo de bagunça no fixture do TCE-PR; aqui o
+que importa testar é o CONTEÚDO: uma citação do próprio TCE-MG (link, sem
+número de acórdão) e uma citação de acórdão do TCU citada dentro do boletim
+do TCE-MG (número de acórdão, mas sem link nenhum) — achado real da
+investigação, documentado em teste.
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Informativo de Jurisprudência n. 333 - TCE-MG</title></head>
+<body>
+            <div class="conteudo">
+                <div class="breadcrumb">
+                    <h2>Você está aqui:</h2>
+                    <a disabled> Informações e Serviços</a>
+                    <a disabled> Normas e Jurisprudência</a>
+                    <a disabled> Informativo de Jurisprudência</a>
+                </div>
+
+                <h1 class="titulo-padrao">Informativo de Jurisprudência n. 333</h1>
+                <h2 class="data-noticia-internas">07/07/2026</h2>
+
+                <p>O Informativo de Jurisprudência do TCEMG consiste em resumos elaborados a partir de notas tomadas nas sessões de julgamento das Câmaras e do Tribunal Pleno, mas não se trata de repositório oficial de jurisprudência. Contém, ainda, seleção de ementas publicadas no Diário Oficial de Contas (DOC) e matérias selecionadas oriundas do STF, do STJ, do TCU e do TJMG.</p>
+
+                <h2>Tribunal de Contas do Estado de Minas Gerais</h2>
+
+                <p>Trata-se de representação formulada em face de suposta irregularidade em procedimento licitatório promovido por município mineiro.</p>
+
+                <p>(...)</p>
+
+                <p>Processo <a href="https://tcjuris.tce.mg.gov.br/Home/Detalhes/1152957">1152957</a> - Representação. Primeira Câmara. Sessão de 16/6/2026. Rel. Conselheiro Alencar da Silveira Jr.</p>
+                <p><b>ATENÇÃO:</b> O link acima funcionará somente após a publicação do processo no DOC.</p>
+
+                <h2>Tribunal de Contas da União</h2>
+
+                <p>Licitação. Contrato de obra pública. Garantia contratual apresentada de maneira exitosa, pois a construtora pode abandoná-la ou não entregá-la nos padrões exigidos.</p>
+
+                <p><b>Acórdão 1370/2026 Plenário</b> (Representação, Relator Ministro Jhonatan de Jesus)</p>
+
+                <p>(...)</p>
+
+                <div align="center">
+                    <div style="color: rgb(63, 76, 93); text-align: center;">Edições anteriores:&nbsp;<a href="http://www.tce.mg.gov.br/noticia/?cod_secao=1ISP&amp;tipo=1&amp;url=&amp;cod_secao_menu=5L">Clique aqui</a>&nbsp;/ Contate-nos em&nbsp;<a href="mailto:jurisprudencia@tce.mg.gov.br">jurisprudencia@tce.mg.gov.br</a></div>
+                </div>
+                <div style="text-align: center;"><b>Responsáveis:</b></div>
+                <p style="text-align: center;">André Gustavo de Oliveira Toledo</p>
+                <style>
+                    .data-noticia-internas { display: none; }
+                </style>
+            </div>
+</body>
+</html>
