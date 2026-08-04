@@ -1,0 +1,40 @@
+<!--
+Fixture de teste: recorte real de
+https://www.tce.pr.gov.br/conteudo/boletim-informativo-de-jurisprudencia-do-tce-pr-n-184-2026.htm,
+capturado em 2026-08-04. Esta edição usa um template BEM diferente do
+179 (mais moderno: <blockquote>/<p class="bij-reference"> em vez de spans
+aninhados) — inclusive o cabeçalho do item não é <h1>, é
+<p role="heading">. É por isso que o parser mantém qualquer <p>, não só
+<h1>. O <style> embutido é real (cortado de ~50KB pra poucas linhas) —
+serve pra testar que o parser NÃO deixa CSS vazar pro texto extraído.
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Boletim Informativo de Jurisprudência do TCE-PR n.º 184/2026</title></head>
+<body>
+<main class="ready-search-details content-migrated max-width-container">
+	<style type="text/css">#tce-bij-184,#tce-bij-184 *{box-sizing:border-box}#tce-bij-184{--blue:#006eb6;--blue-dark:#123b57;--cyan:#009fe3;--bg:#f4f7fa}
+	/* [fixture de teste: bloco de estilo real truncado — no arquivo de verdade tem ~50KB de CSS aqui, tudo isso NÃO pode aparecer no texto extraído] */
+	#tce-bij-184 .bij-reference{font-weight:600}</style>
+	<h1>Boletim Informativo de Jurisprudência do TCE-PR n.º 184/2026</h1>
+
+<header class="bij-decision-header">
+<p aria-level="3" class="bij-ementa" role="heading">1. Tomada de contas extraordinária. Contratação de empresa privada para prestação de serviços de recuperação de créditos junto à Receita Federal. Ofensa ao Prejulgado n.º 06-TCE/PR.</p>
+</header>
+
+<blockquote aria-label="Trecho literal do acórdão" class="bij-excerpt"><span aria-hidden="true" class="bij-quote bij-open">“</span>
+
+<div class="bij-excerpt-text">
+<p style="text-align:justify!important;">(...)</p>
+
+<p style="text-align:justify!important;">No intuito de enfatizar a gravidade dos fatos abordados, reforço minha dialética quando da concessão da medida cautelar outrora deferida.</p>
+
+<p style="text-align:justify!important;">[fixture de teste: parágrafos de corpo reais truncados aqui]</p>
+</div>
+<span aria-hidden="true" class="bij-quote bij-close">”</span></blockquote>
+
+<p class="bij-reference" style="text-align:justify!important;">(TOMADA DE CONTAS EXTRAORDINÁRIA n.º 430366/2025, <a rel="noopener noreferrer" target="_blank" href="https://viajuris.tce.pr.gov.br/Pesquisa/Visualizar/459/2026/ACO/S1C">Acórdão n.º 459/2026</a>, Primeira Câmara, Rel. JOSE DURVAL MATTOS DO AMARAL, julgado em 02/03/2026, veiculado em 12/03/2026 no DETC)</p>
+
+</main>
+</body>
+</html>
