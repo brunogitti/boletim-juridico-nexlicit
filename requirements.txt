@@ -1,6 +1,6 @@
 python-dotenv==1.2.2
 pytest==9.1.1
+requests==2.34.2
 
-# Dependências de coleta (requests, beautifulsoup4), PDF (pymupdf) e LLM
-# (google-genai) entram nas etapas correspondentes (2, 3 e 5), uma de cada
-# vez — não tudo de uma vez aqui.
+# Dependências de PDF (pymupdf) e LLM (google-genai) entram nas etapas
+# correspondentes (3 e 5), uma de cada vez — não tudo de uma vez aqui.
