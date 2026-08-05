@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Fixture de teste: recorte real de
+https://ww2.stj.jus.br/jurisprudencia/externo/InformativoFeed, capturado
+em 2026-08-05. O feed de verdade tem 928 entradas; aqui ficaram só as 6
+primeiras — 2 edições regulares (895, 894) intercaladas com 3
+extraordinárias (33, 32, 31, numeração "NNNNE" separada, que o coletor
+deve ignorar) e mais uma regular (893), pra confirmar que o filtro pega
+só as regulares mesmo intercaladas.
+-->
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="pt-br">
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/</id>
+<title>STJ - Informativos de Jurisprudência</title>
+<updated>2026-08-04T00:00:00-03:00</updated>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/"/>
+<link rel="self" href="https://ww2.stj.jus.br/jurisprudencia/externo/InformativoFeed" />
+<author>
+<name>Secretaria de Jurisprudência</name>
+<email>informativo.jurisprudencia@stj.jus.br</email>
+<uri>https://www.stj.jus.br/SCON/</uri>
+</author>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0895</id>
+<title>Informativo n. 895 - 4 de agosto de 2026.</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0895.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-08-04T00:00:00-03:00</updated>
+</entry>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0033E</id>
+<title>Informativo n. 33 - 28 de julho de 2026.</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0033E.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-07-28T00:00:00-03:00</updated>
+</entry>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0032E</id>
+<title>Informativo n. 32 - 21 de julho de 2026.</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0032E.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-07-21T00:00:00-03:00</updated>
+</entry>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0031E</id>
+<title>Informativo n. 31 - 14 de julho de 2026 - Direito Público</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0031E.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-07-14T00:00:00-03:00</updated>
+</entry>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0894</id>
+<title>Informativo n. 894 - 30 de junho de 2026.</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0894.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-06-30T00:00:00-03:00</updated>
+</entry>
+<entry>
+<id>https://ww2.stj.jus.br/jurisprudencia/externo/informativo/INFJ0893</id>
+<title>Informativo n. 893 - 23 de junho de 2026.</title>
+<link href="https://ww2.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&amp;livre=0893.cod.&amp;from=feed"/>
+<summary type="html"></summary>
+<updated>2026-06-23T00:00:00-03:00</updated>
+</entry>
+</feed>
