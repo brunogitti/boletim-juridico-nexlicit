@@ -53,17 +53,9 @@ from html.parser import HTMLParser
 import requests
 
 from nucleo.banco import inserir_item_bruto, transacao
+from nucleo.coleta_comum import USER_AGENT
 
 FEED_URL = "https://ww2.stj.jus.br/jurisprudencia/externo/InformativoFeed"
-# O Cloudflare do STJ devolve 403 pra User-Agent com caractere acentuado
-# (confirmado isolando a variável: mesma requisição, só trocando "não"
-# por "nao" já resolve — cabeçalho HTTP não é UTF-8, e um UA com byte
-# multibyte cru é sinal clássico de tráfego anômalo pra esse WAF). Por
-# isso, diferente dos outros coletores, este aqui evita acento no UA.
-USER_AGENT = (
-    "BoletimJuridicoNexLicit/0.1 (uso pessoal e nao comercial; "
-    "ver docs/ARQUITETURA.md)"
-)
 INTERVALO_ENTRE_REQUISICOES = 1.5  # segundos, cortesia com o servidor
 TENTATIVAS_MAX = 3
 ESPERA_INICIAL = 1.0  # segundos; dobra a cada nova tentativa

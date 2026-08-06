@@ -30,12 +30,9 @@ from xml.etree import ElementTree
 import requests
 
 from nucleo.banco import inserir_item_bruto, transacao
+from nucleo.coleta_comum import USER_AGENT
 
 BASE_URL = "https://zenite.com.br"
-USER_AGENT = (
-    "BoletimJuridicoNexLicit/0.1 (uso pessoal e não comercial; "
-    "ver docs/ARQUITETURA.md)"
-)
 INTERVALO_ENTRE_REQUISICOES = 1.5  # segundos, cortesia com o servidor
 TENTATIVAS_MAX = 3
 ESPERA_INICIAL = 1.0  # segundos; dobra a cada nova tentativa

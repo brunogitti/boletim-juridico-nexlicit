@@ -39,14 +39,11 @@ from urllib.parse import urljoin
 import requests
 
 from nucleo.banco import inserir_item_bruto, transacao
+from nucleo.coleta_comum import USER_AGENT
 
 INDICE_URL = (
     "https://www.tce.pr.gov.br/fiscalizado/informativos-do-tcepr/"
     "boletim-informativo-de-jurisprudencia/"
-)
-USER_AGENT = (
-    "BoletimJuridicoNexLicit/0.1 (uso pessoal e não comercial; "
-    "ver docs/ARQUITETURA.md)"
 )
 INTERVALO_ENTRE_REQUISICOES = 1.5  # segundos, cortesia com o servidor
 TENTATIVAS_MAX = 3

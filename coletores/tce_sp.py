@@ -48,14 +48,11 @@ import fitz
 import requests
 
 from nucleo.banco import inserir_item_bruto, transacao
+from nucleo.coleta_comum import USER_AGENT
 
 BASE_URL = "https://www.tce.sp.gov.br"
 BOLETIM_LISTAGEM_URL = f"{BASE_URL}/boletim-de-jurisprudencia/publicacoes"
 SUMULAS_URL = f"{BASE_URL}/boletim-de-jurisprudencia/sumulas"
-USER_AGENT = (
-    "BoletimJuridicoNexLicit/0.1 (uso pessoal e não comercial; "
-    "ver docs/ARQUITETURA.md)"
-)
 INTERVALO_ENTRE_REQUISICOES = 1.5  # segundos, cortesia com o servidor
 TENTATIVAS_MAX = 3
 ESPERA_INICIAL = 1.0  # segundos; dobra a cada nova tentativa

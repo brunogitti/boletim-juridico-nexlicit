@@ -56,6 +56,7 @@ from urllib.parse import quote
 import requests
 
 from nucleo.banco import inserir_item_bruto, transacao
+from nucleo.coleta_comum import USER_AGENT
 
 LC_CSV_URL = (
     "https://sites.tcu.gov.br/dados-abertos/jurisprudencia/arquivos/"
@@ -70,10 +71,6 @@ BUSCA_ACORDAO_URL_BASE = (
     "DTRELEVANCIA%20desc,%20NUMACORDAOINT%20desc/0"
 )
 
-USER_AGENT = (
-    "BoletimJuridicoNexLicit/0.1 (uso pessoal e nao comercial; "
-    "ver docs/ARQUITETURA.md)"
-)
 INTERVALO_ENTRE_REQUISICOES = 1.5  # segundos, cortesia com o servidor
 TENTATIVAS_MAX = 3
 ESPERA_INICIAL = 1.0  # segundos; dobra a cada nova tentativa
