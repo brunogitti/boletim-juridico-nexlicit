@@ -106,15 +106,17 @@ def test_extrair_conteudo_principal_preserva_os_dois_padroes_de_citacao():
     assert "<style" not in conteudo
     assert "display: none" not in conteudo
 
-    # citação do próprio TCE-MG: tem link, não tem número de acórdão
+    # citação do próprio TCE-MG: tem link, não tem número de acórdão.
+    # traço é travessão (–, U+2013), não hífen — achado real que já
+    # confundiu um fixture simplificado à mão antes (ver nucleo/fatiador.py)
     assert (
         'Processo <a href="https://tcjuris.tce.mg.gov.br/Home/Detalhes/1152957">'
-        "1152957</a> - Representação" in conteudo
+        "1152957</a> – Representação" in conteudo
     )
     assert "Acórdão" not in conteudo.split("Tribunal de Contas da União")[0]
 
     # citação do TCU dentro do boletim: tem número de acórdão, mas sem link
-    assert "<b>Acórdão 1370/2026 Plenário</b>" in conteudo
+    assert "<b>Acórdão 2507/2026 Primeira Câmara</b>" in conteudo
     assert '<a href="https://viajuris' not in conteudo  # não é citação do TCE-PR
 
 

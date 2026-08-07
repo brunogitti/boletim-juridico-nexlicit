@@ -58,6 +58,9 @@ def test_fatiar_tce_pr_usa_fixture_real():
         "3190-2025-primeira-camara-thiago-barbosa-cordeiro-tomada-de-"
         "contas-extraordinaria-prejulgados-5/200060"
     )
+    assert primeira.identificador_exibicao is not None
+    assert "3190/2025" in primeira.identificador_exibicao
+    assert "THIAGO BARBOSA CORDEIRO" in primeira.identificador_exibicao
 
     assert segunda.numero_acordao == "3220/2025"
     assert segunda.numero_processo == "582863/2012"
@@ -67,30 +70,87 @@ def test_fatiar_tce_pr_usa_fixture_real():
 
 
 # --- TCE-MG: fatia de verdade, dois tribunais dentro da mesma edição -----
+#
+# Os dois fixtures abaixo são página real capturada ao vivo em 2026-08-07
+# (não simplificada à mão) — a versão anterior tinha <h2> sintético em
+# volta do nome do tribunal, que não existe no site de verdade, e por
+# isso escondeu o bug real de segmentação até rodar contra dado real.
 
-def test_fatiar_tce_mg_usa_fixture_real():
+def test_fatiar_tce_mg_variante_1_ancora_vazia_usa_fixture_real():
+    # edição 333: cabeçalho de seção é <p><a></a>Nome do Tribunal</p>
     html_texto = (FIXTURES / "tce_mg" / "informativo_333.html").read_text(encoding="utf-8")
     texto_bruto = tce_mg._extrair_conteudo_principal(html_texto)
 
     decisoes = fatiador._fatiar_tce_mg(item_bruto_id=1, texto_bruto=texto_bruto)
 
-    assert len(decisoes) == 2
+    assert len(decisoes) == 9  # 3 próprias + 6 do TCU embutidas na mesma edição
 
-    propria, tcu_embutida = decisoes
+    proprias = [d for d in decisoes if d.tribunal == "TCE-MG"]
+    outras = [d for d in decisoes if d.tribunal != "TCE-MG"]
+    assert len(proprias) == 3
+    assert len(outras) == 6
+    assert {d.tribunal for d in outras} == {"TCU"}
 
-    assert propria.tribunal == "TCE-MG"
-    assert propria.numero_acordao is None  # achado real: TCE-MG não cita acórdão
-    assert propria.numero_processo == "1152957"
-    assert propria.orgao_julgador == "Primeira Câmara"
-    assert propria.relator == "Conselheiro Alencar da Silveira Jr."
-    assert propria.data_julgamento == "2026-06-16"
-    assert propria.url_inteiro_teor == "https://tcjuris.tce.mg.gov.br/Home/Detalhes/1152957"
+    primeira = proprias[0]
+    assert primeira.numero_acordao is None  # achado real: TCE-MG não cita acórdão aqui
+    assert primeira.numero_processo == "1152957"
+    assert primeira.orgao_julgador == "Primeira Câmara"
+    assert primeira.relator == "Conselheiro Alencar da Silveira Jr."
+    assert primeira.data_julgamento == "2026-06-16"
+    assert primeira.url_inteiro_teor == "https://tcjuris.tce.mg.gov.br/Home/Detalhes/1152957"
+    assert primeira.identificador_exibicao == (
+        "Processo 1152957 — Rel. Conselheiro Alencar da Silveira Jr."
+    )
 
-    assert tcu_embutida.tribunal == "TCU"
-    assert tcu_embutida.numero_acordao == "1370/2026"
-    assert tcu_embutida.orgao_julgador == "Plenário"
-    assert tcu_embutida.relator == "Jhonatan de Jesus"
-    assert tcu_embutida.url_inteiro_teor is None  # achado real: sem link nesse trecho
+    por_numero = {d.numero_acordao: d for d in outras}
+
+    # citação normal: "Acórdão N/AAAA Órgão" numa <b> só
+    normal = por_numero["2507/2026"]
+    assert normal.orgao_julgador == "Primeira Câmara"
+    assert normal.relator == "Benjamin Zymler"
+    assert normal.url_inteiro_teor is None  # achado real: sem link nesse trecho
+    assert normal.identificador_exibicao == "Acórdão 2507/2026 — Rel. Benjamin Zymler"
+
+    # achado real: "Acórdão" e "N/AAAA Órgão" em duas tags <b> separadas
+    # (resíduo de exportação do Word) — mesma edição, formato diferente
+    com_b_separado = por_numero["1370/2026"]
+    assert com_b_separado.orgao_julgador == "Plenário"
+    assert com_b_separado.relator == "Jhonatan de Jesus"
+    assert com_b_separado.identificador_exibicao == "Acórdão 1370/2026 — Rel. Jhonatan de Jesus"
+
+
+def test_fatiar_tce_mg_variante_2_ancora_envolve_texto_usa_fixture_real():
+    # edição 334: cabeçalho de seção é <p><b><a>Nome do Tribunal</a></b></p>
+    # (âncora envolve o texto, tudo em negrito) — variante real diferente
+    # da 333, mesma citação própria por baixo
+    html_texto = (FIXTURES / "tce_mg" / "informativo_334.html").read_text(encoding="utf-8")
+    texto_bruto = tce_mg._extrair_conteudo_principal(html_texto)
+
+    decisoes = fatiador._fatiar_tce_mg(item_bruto_id=1, texto_bruto=texto_bruto)
+
+    assert len(decisoes) == 23  # 14 próprias + 9 do TCU
+
+    proprias = [d for d in decisoes if d.tribunal == "TCE-MG"]
+    outras = [d for d in decisoes if d.tribunal != "TCE-MG"]
+    assert len(proprias) == 14
+    assert {d.tribunal for d in outras} == {"TCU"}
+    assert all(d.numero_processo is not None for d in proprias)
+    assert all(d.numero_acordao is not None for d in outras)
+
+
+def test_dividir_por_secao_tce_mg_ignora_cabecalho_generico_sem_trocar_tribunal():
+    # regressão: "DESTAQUE"/"Ementas por Área Temática" não são nome de
+    # tribunal — não podem resetar o tribunal corrente pro meio do caminho
+    texto = (
+        "<p>conteúdo antes de qualquer cabeçalho (TCE-MG implícito)</p>"
+        '<p><a></a>DESTAQUE</p>'
+        "<p>ainda TCE-MG, só reorganizado</p>"
+        '<p><a></a>Tribunal de Contas da União</p>'
+        "<p>agora sim é TCU</p>"
+    )
+    segmentos = fatiador._dividir_por_secao_tce_mg(texto)
+    tribunais = [tribunal for tribunal, _ in segmentos]
+    assert tribunais == ["TCE-MG", "TCE-MG", "TCU"]
 
 
 # --- TCE-SP boletim (PDF): fatia de verdade, pula o Sumário ---------------
@@ -148,6 +208,9 @@ def test_fatiar_stj_usa_fixture_real():
     assert com_link.orgao_julgador == "Primeira Turma"
     assert com_link.relator == "Benedito Gonçalves"
     assert com_link.data_julgamento == "2026-04-13"
+    assert com_link.identificador_exibicao == (
+        "Processo AgInt no REsp 2.162.500-RJ — Rel. Benedito Gonçalves"
+    )
 
     sem_link = fatiador._fatiar_stj(1, itens[1].texto_bruto, itens[1].url_origem, itens[1].data_publicacao)[0]
     assert sem_link.numero_processo == "Processo em segredo de justiça"
@@ -171,6 +234,7 @@ def test_fatiar_tcu_usa_fixture_real():
     assert decisao.orgao_julgador == "Primeira Câmara"
     assert decisao.relator == "Bruno Dantas"
     assert decisao.url_inteiro_teor == item.url_origem
+    assert decisao.identificador_exibicao == "Acórdão 2357/2026 — Rel. Bruno Dantas"
 
 
 def test_fatiar_tcu_nao_confunde_titulo_com_citacao():

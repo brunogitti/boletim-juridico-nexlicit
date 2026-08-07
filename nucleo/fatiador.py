@@ -40,6 +40,15 @@ class DecisaoFatiada:
     data_julgamento: str | None  # ISO 8601 (AAAA-MM-DD), quando extraível
     url_inteiro_teor: str | None
     texto_decisao: str
+    # String curta pra diferenciar itens nas tabelas de log/triagem — não é
+    # o título do boletim (Etapa 7, ver docs/ARQUITETURA.md Camada 6), só um
+    # apoio de leitura enquanto calibramos a triagem. TCE-PR usa a própria
+    # linha de citação (já extraída, mais rica que qualquer coisa que a
+    # gente monte). As fontes sem linha de citação própria usam o padrão
+    # genérico de _identificador_padrao. None quando a fonte ainda não
+    # populou (TCE-SP, Zênite — não pedido; TCE-MG — aguardando fix da
+    # segmentação por tribunal).
+    identificador_exibicao: str | None = None
 
 
 def fatiar_item(
@@ -101,14 +110,40 @@ def _fatiar_tce_pr(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
             data_julgamento=_data_br_para_iso(data),
             url_inteiro_teor=html.unescape(url),
             texto_decisao=_texto_puro(texto_decisao),
+            # a própria linha de citação do TCE-PR já é o identificador
+            # mais completo que existe — número de processo, acórdão,
+            # órgão, relator e data numa frase só
+            identificador_exibicao=_texto_puro(m.group(0)),
         ))
         inicio = m.end()
     return decisoes
 
 
 # --- TCE-MG --------------------------------------------------------------
+#
+# Achado real (2026-08-07, smoke test contra os 19 itens já coletados): o
+# cabeçalho de seção NÃO é <h2> (isso só existe pro breadcrumb e pra data
+# da edição). O nome do tribunal aparece de dois jeitos, os dois reais,
+# confirmados contra páginas ao vivo (edições 333 e 334):
+#   variante 1: <p><a></a>Nome do Tribunal</p>            (âncora vazia)
+#   variante 2: <p><b><a>Nome do Tribunal</a></b></p>     (âncora envolve o texto)
+# As duas nunca têm href — os <a href="#tN">...</a> que aparecem antes são
+# o sumário/índice da própria edição, não o cabeçalho de verdade, e por
+# isso são excluídos explicitamente do padrão abaixo.
+#
+# Além disso, o traço da citação própria ("Processo <a...>ID</a> – Tipo...")
+# é travessão (–, U+2013), não hífen (-, U+002D) — o fixture antigo (feito à
+# mão, não HTML real) tinha os dois errados, o que escondeu os dois bugs.
+#
+# **Limitação conhecida, aceita por ora** (ver docs/ARQUITETURA.md, Riscos):
+# edições anteriores à 332 usam uma estrutura de sumário totalmente
+# diferente (organizada por colegiado — "Tribunal Pleno", "Segunda
+# Câmara" — em vez de por tribunal) e a citação própria nem usa o formato
+# "Processo <a...>" nessas edições. Não cobrimos essa variante agora;
+# esses itens ficam com status='erro' (fatiar_item devolve lista vazia,
+# rodar_triagem.py trata isso como falha, não como sucesso silencioso).
 
-_MAPEAMENTO_TRIBUNAL_H2 = {
+_MAPEAMENTO_TRIBUNAL_TCE_MG = {
     "tribunal de contas do estado de minas gerais": "TCE-MG",
     "tribunal de contas da união": "TCU",
     "supremo tribunal federal": "STF",
@@ -116,8 +151,12 @@ _MAPEAMENTO_TRIBUNAL_H2 = {
     "tribunal de justiça de minas gerais": "TJMG",
 }
 
+_PADRAO_CABECALHO_TCE_MG = re.compile(
+    r"<p>\s*(?:<b>)?\s*<a(?![^>]*\bhref\b)[^>]*>([^<]*)</a>(?:</b>)?\s*([^<]*?)\s*</p>"
+)
+
 _PADRAO_TCE_MG_PROPRIO = re.compile(
-    r'<p>Processo\s*<a href="([^"]+)">([^<]+)</a>\s*-\s*'
+    r'<p>Processo\s*<a href="([^"]+)">([^<]+)</a>\s*[-–]\s*'
     r'[^.]+\.\s*'  # tipo de processo — sem coluna própria, descartado
     r'([^.]+)\.\s*'
     r'(?:Sess[ãa]o de|Deliberado em)\s*(\d{1,2}/\d{1,2}/\d{4})\.?'
@@ -125,53 +164,80 @@ _PADRAO_TCE_MG_PROPRIO = re.compile(
     r'\s*Rel\.\s*([^<]+?)\s*</p>'
 )
 _PADRAO_TCE_MG_OUTRO_TRIBUNAL = re.compile(
-    r"<b>Acórdão\s*(\d+/\d+)\s*([^<]+?)</b>\s*\([^,]+,\s*Relator\s*"
+    # "Acórdão" e "N/AAAA Órgão" às vezes vêm em duas tags <b> separadas
+    # (resíduo de exportação do Word) em vez de uma só — achado real,
+    # edição 333 tem as duas variantes na mesma página
+    r"<b>Acórdão(?:</b>\s*<b>)?\s*(\d+/\d+)\s*([^<]+?)</b>\s*\([^,]+,\s*Relator\s*"
     r"(?:Ministro|Ministra)\s*([^)]+)\)"
 )
 
 
 def _fatiar_tce_mg(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]:
     decisoes = []
-    for tribunal, segmento in _dividir_por_h2_tce_mg(texto_bruto):
+    for tribunal, segmento in _dividir_por_secao_tce_mg(texto_bruto):
         if tribunal == "TCE-MG":
             for m in _PADRAO_TCE_MG_PROPRIO.finditer(segmento):
                 url, numero_processo, orgao, data, relator = m.groups()
+                numero_processo = numero_processo.strip()
+                relator = _normalizar_espacos(relator)
+                data_iso = _data_br_para_iso(data)
                 decisoes.append(DecisaoFatiada(
                     item_bruto_id=item_bruto_id,
                     tribunal="TCE-MG",
                     numero_acordao=None,  # achado real: TCE-MG não cita acórdão aqui
-                    numero_processo=numero_processo.strip(),
+                    numero_processo=numero_processo,
                     orgao_julgador=_normalizar_espacos(orgao),
-                    relator=_normalizar_espacos(relator),
-                    data_julgamento=_data_br_para_iso(data),
+                    relator=relator,
+                    data_julgamento=data_iso,
                     url_inteiro_teor=html.unescape(url),
                     texto_decisao=_texto_puro(m.group(0)),
+                    identificador_exibicao=_identificador_padrao(
+                        numero_acordao=None, numero_processo=numero_processo,
+                        relator=relator, data_julgamento=data_iso,
+                    ),
                 ))
         else:
             for m in _PADRAO_TCE_MG_OUTRO_TRIBUNAL.finditer(segmento):
                 numero_acordao, orgao, relator = m.groups()
+                relator = _normalizar_espacos(relator)
                 decisoes.append(DecisaoFatiada(
                     item_bruto_id=item_bruto_id,
                     tribunal=tribunal,
                     numero_acordao=numero_acordao,
                     numero_processo=None,
                     orgao_julgador=_normalizar_espacos(orgao),
-                    relator=_normalizar_espacos(relator),
+                    relator=relator,
                     data_julgamento=None,  # não informado nesse formato
                     url_inteiro_teor=None,  # achado real: sem link nesses trechos
                     texto_decisao=_texto_puro(m.group(0)),
+                    identificador_exibicao=_identificador_padrao(
+                        numero_acordao=numero_acordao, numero_processo=None,
+                        relator=relator, data_julgamento=None,
+                    ),
                 ))
     return decisoes
 
 
-def _dividir_por_h2_tce_mg(texto_bruto: str) -> list[tuple[str | None, str]]:
-    partes = re.split(r"<h2>([^<]*)</h2>", texto_bruto)
-    segmentos = []
-    for i in range(1, len(partes), 2):
-        texto_h2 = partes[i].strip().lower()
-        conteudo = partes[i + 1] if i + 1 < len(partes) else ""
-        tribunal = _MAPEAMENTO_TRIBUNAL_H2.get(texto_h2)
-        segmentos.append((tribunal, conteudo))
+def _dividir_por_secao_tce_mg(texto_bruto: str) -> list[tuple[str, str]]:
+    """Separa a edição em blocos por cabeçalho de seção real (as duas
+    variantes de _PADRAO_CABECALHO_TCE_MG). Cabeçalho que não bate com
+    nome de tribunal conhecido (ex. "DESTAQUE", "Ementas por Área
+    Temática") não troca o tribunal corrente — só reorganiza o mesmo
+    conteúdo por dentro, então o bloco seguinte continua valendo pro
+    tribunal que já estava em vigor. Tudo antes do primeiro cabeçalho
+    reconhecido é implicitamente TCE-MG (é onde a introdução/sumário
+    ficam, mas eles não geram decisão nenhuma, então não tem risco de
+    atribuição errada)."""
+    partes = _PADRAO_CABECALHO_TCE_MG.split(texto_bruto)
+    segmentos = [("TCE-MG", partes[0])]
+    tribunal_atual = "TCE-MG"
+    i = 1
+    while i < len(partes):
+        texto_cabecalho = (partes[i] + partes[i + 1]).strip().lower()
+        conteudo = partes[i + 2] if i + 2 < len(partes) else ""
+        tribunal_atual = _MAPEAMENTO_TRIBUNAL_TCE_MG.get(texto_cabecalho, tribunal_atual)
+        segmentos.append((tribunal_atual, conteudo))
+        i += 3
     return segmentos
 
 
@@ -293,19 +359,30 @@ def _fatiar_stj(
             numero_processo=None, orgao_julgador=None, relator=None,
             data_julgamento=data_publicacao, url_inteiro_teor=url_origem,
             texto_decisao=texto_bruto,
+            identificador_exibicao=_identificador_padrao(
+                numero_acordao=None, numero_processo=None,
+                relator=None, data_julgamento=data_publicacao,
+            ),
         )]
 
     numero_processo, relator, orgao, data = m.groups()
+    numero_processo = numero_processo.strip()
+    relator = _normalizar_espacos(relator)
+    data_iso = _data_br_para_iso(data)
     return [DecisaoFatiada(
         item_bruto_id=item_bruto_id,
         tribunal="STJ",
         numero_acordao=None,  # achado real: STJ cita por recurso, não acórdão
-        numero_processo=numero_processo.strip(),
+        numero_processo=numero_processo,
         orgao_julgador=_normalizar_espacos(orgao),
-        relator=_normalizar_espacos(relator),
-        data_julgamento=_data_br_para_iso(data),
+        relator=relator,
+        data_julgamento=data_iso,
         url_inteiro_teor=url_origem,
         texto_decisao=texto_bruto,
+        identificador_exibicao=_identificador_padrao(
+            numero_acordao=None, numero_processo=numero_processo,
+            relator=relator, data_julgamento=data_iso,
+        ),
     )]
 
 
@@ -328,19 +405,29 @@ def _fatiar_tcu(item_bruto_id: int, texto_bruto: str, url_origem: str) -> list[D
             numero_processo=None, orgao_julgador=None, relator=None,
             data_julgamento=None, url_inteiro_teor=url_origem,
             texto_decisao=texto_bruto,
+            identificador_exibicao=_identificador_padrao(
+                numero_acordao=None, numero_processo=None,
+                relator=None, data_julgamento=None,
+            ),
         )]
 
     numero, ano, orgao, relator = m.groups()
+    numero_acordao = f"{numero}/{ano}"
+    relator = _normalizar_espacos(relator)
     return [DecisaoFatiada(
         item_bruto_id=item_bruto_id,
         tribunal="TCU",
-        numero_acordao=f"{numero}/{ano}",
+        numero_acordao=numero_acordao,
         numero_processo=None,
         orgao_julgador=_normalizar_espacos(orgao),
-        relator=_normalizar_espacos(relator),
+        relator=relator,
         data_julgamento=None,  # não vem na CSV de dados abertos (achado da Etapa 3e)
         url_inteiro_teor=url_origem,
         texto_decisao=texto_bruto,
+        identificador_exibicao=_identificador_padrao(
+            numero_acordao=numero_acordao, numero_processo=None,
+            relator=relator, data_julgamento=None,
+        ),
     )]
 
 
@@ -361,6 +448,28 @@ def _fatiar_zenite(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
 
 
 # --- Utilidades compartilhadas --------------------------------------------
+
+def _identificador_padrao(
+    *, numero_acordao: str | None, numero_processo: str | None,
+    relator: str | None, data_julgamento: str | None,
+) -> str:
+    """Identificador de exibição pras fontes sem linha de citação própria
+    (TCE-MG, STJ, TCU): número (acórdão de preferência, senão processo) +
+    relator quando houver, senão + data. Só um apoio de leitura nas
+    tabelas de log/triagem — não é o título do boletim (Camada 6)."""
+    if numero_acordao:
+        numero = f"Acórdão {numero_acordao}"
+    elif numero_processo:
+        numero = f"Processo {numero_processo}"
+    else:
+        numero = "sem identificador"
+
+    if relator:
+        return f"{numero} — Rel. {relator}"
+    if data_julgamento:
+        return f"{numero} — {data_julgamento}"
+    return numero
+
 
 def _data_br_para_iso(data_texto: str) -> str | None:
     m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", data_texto.strip())

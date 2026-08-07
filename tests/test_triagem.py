@@ -1,0 +1,140 @@
+"""Testes de nucleo/triagem.py — cliente LLM falso (não chama a API real,
+custaria quota e não seria reprodutível), regra de precedência de
+metadados e corte de trecho."""
+
+from nucleo.fatiador import DecisaoFatiada
+from nucleo.llm import ClienteLLM
+from nucleo.triagem import (
+    TRIBUNAL_NAO_IDENTIFICADO,
+    ResultadoTriagem,
+    extrair_trecho,
+    mesclar_metadados,
+    triar,
+)
+
+
+class _ClienteFalso(ClienteLLM):
+    def __init__(self, resposta: dict):
+        self.resposta = resposta
+        self.ultima_chamada: dict | None = None
+
+    def gerar_json(self, *, instrucoes, entrada, schema) -> dict:
+        self.ultima_chamada = {
+            "instrucoes": instrucoes, "entrada": entrada, "schema": schema,
+        }
+        return self.resposta
+
+
+def _decisao_fatiada(**overrides) -> DecisaoFatiada:
+    padrao = dict(
+        item_bruto_id=1, tribunal=None, numero_acordao=None,
+        numero_processo=None, orgao_julgador=None, relator=None,
+        data_julgamento=None, url_inteiro_teor=None, texto_decisao="texto",
+    )
+    padrao.update(overrides)
+    return DecisaoFatiada(**padrao)
+
+
+# --- triar() ----------------------------------------------------------------
+
+def test_triar_monta_entrada_com_titulo_e_trecho():
+    cliente = _ClienteFalso({"relevante": True, "motivo": "trata de habilitação técnica"})
+    triar(cliente, titulo="Acórdão 123/2026", trecho="Trecho da ementa.")
+
+    assert cliente.ultima_chamada is not None
+    assert "Acórdão 123/2026" in cliente.ultima_chamada["entrada"]
+    assert "Trecho da ementa." in cliente.ultima_chamada["entrada"]
+
+
+def test_triar_aceita_resposta_so_com_campos_obrigatorios():
+    # schema só exige "relevante" e "motivo" — os demais campos podem vir
+    # ausentes do JSON (é assim que o schema representa "null" sem
+    # depender de {"type": ["string", "null"]}, que a doc do Gemini
+    # registra como inconsistente em response_json_schema)
+    cliente = _ClienteFalso({"relevante": False, "motivo": "trata só de pessoal"})
+    resultado = triar(cliente, titulo="x", trecho="y")
+
+    assert resultado == ResultadoTriagem(
+        relevante=False, motivo="trata só de pessoal", tema=None, tribunal=None,
+        numero_acordao=None, relator=None, data_julgamento=None, impacto_estimado=None,
+    )
+
+
+def test_triar_le_todos_os_campos_quando_presentes():
+    cliente = _ClienteFalso({
+        "relevante": True, "motivo": "exigência de atestado técnico",
+        "tema": "qualificacao_tecnica", "tribunal": "TCE-PR",
+        "numero_acordao": "3190/2025", "relator": "FULANO", "data_julgamento": "2025-11-10",
+        "impacto_estimado": "medio",
+    })
+    resultado = triar(cliente, titulo="x", trecho="y")
+
+    assert resultado.tema == "qualificacao_tecnica"
+    assert resultado.impacto_estimado == "medio"
+
+
+# --- extrair_trecho() --------------------------------------------------------
+
+def test_extrair_trecho_pega_so_o_primeiro_paragrafo():
+    texto = "Primeiro parágrafo, a ementa.\n\nSegundo parágrafo, detalhamento longo."
+    assert extrair_trecho(texto) == "Primeiro parágrafo, a ementa."
+
+
+def test_extrair_trecho_respeita_teto_de_caracteres():
+    texto = "a" * 2000
+    assert len(extrair_trecho(texto, limite=100)) == 100
+
+
+# --- mesclar_metadados() ------------------------------------------------------
+
+def test_mesclar_metadados_fatiador_tem_precedencia():
+    # TCE-PR: fatiador já extraiu tudo por regex — a triagem não pode
+    # sobrescrever, mesmo que devolva algo diferente
+    decisao = _decisao_fatiada(
+        tribunal="TCE-PR", numero_acordao="3190/2025",
+        relator="THIAGO BARBOSA CORDEIRO", data_julgamento="2025-11-10",
+    )
+    resultado = ResultadoTriagem(
+        relevante=True, motivo="x", tema=None, tribunal="TCU",
+        numero_acordao="9999/2099", relator="OUTRO NOME", data_julgamento="2099-01-01",
+        impacto_estimado=None,
+    )
+
+    metadados = mesclar_metadados(decisao, resultado)
+
+    assert metadados == {
+        "tribunal": "TCE-PR", "numero_acordao": "3190/2025",
+        "relator": "THIAGO BARBOSA CORDEIRO", "data_julgamento": "2025-11-10",
+    }
+
+
+def test_mesclar_metadados_usa_triagem_quando_fatiador_deixa_null():
+    # Zênite: fatiador deixa tudo None de propósito
+    decisao = _decisao_fatiada()
+    resultado = ResultadoTriagem(
+        relevante=True, motivo="x", tema="dispensa", tribunal="TCE-SP",
+        numero_acordao="123/2026", relator="FULANA", data_julgamento="2026-01-05",
+        impacto_estimado="alto",
+    )
+
+    metadados = mesclar_metadados(decisao, resultado)
+
+    assert metadados == {
+        "tribunal": "TCE-SP", "numero_acordao": "123/2026",
+        "relator": "FULANA", "data_julgamento": "2026-01-05",
+    }
+
+
+def test_mesclar_metadados_sem_tribunal_em_nenhuma_fonte_usa_sentinela():
+    # notícia da Zênite sobre tendência geral — nem o fatiador nem o LLM
+    # identificam um tribunal específico; NOT NULL da coluna não pode quebrar
+    decisao = _decisao_fatiada()
+    resultado = ResultadoTriagem(
+        relevante=False, motivo="tendência geral, sem tribunal específico",
+        tema=None, tribunal=None, numero_acordao=None, relator=None,
+        data_julgamento=None, impacto_estimado=None,
+    )
+
+    metadados = mesclar_metadados(decisao, resultado)
+
+    assert metadados["tribunal"] == TRIBUNAL_NAO_IDENTIFICADO

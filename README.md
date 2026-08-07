@@ -16,5 +16,16 @@ de sessões de desenvolvimento em [docs/PROMPTS-PLAN-MODE.md](docs/PROMPTS-PLAN-
     copy .env.example .env         # preencher com os valores reais
     python -m pytest tests/ -q
 
-Projeto em construção, uma etapa por vez — sem coletor, banco ou envio
-funcionando ainda nesta fase inicial.
+Depois de preencher `DATABASE_PATH` e `GEMINI_API_KEY` no `.env`, rodar o
+pipeline de verdade contra as fontes reais:
+
+    python -m scripts.coletar_tudo   # camada 1: grava itens_brutos
+    python -m scripts.rodar_triagem  # camadas 3+4: dedup + triagem, grava decisoes
+
+Se algum item ficou com `status='erro'` por falha transitória (ex.: cota do
+LLM esgotada), reprocessar sem repetir a coleta:
+
+    python -m scripts.rodar_triagem --reprocessar-erros
+
+Projeto em construção, uma etapa por vez — boletim e envio ainda não
+implementados nesta fase.

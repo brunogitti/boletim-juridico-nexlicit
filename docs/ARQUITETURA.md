@@ -240,6 +240,18 @@ Cada item carrega: tribunal, número do acórdão, órgão julgador, relator, da
 tema, nível de impacto, resumo, artigos, e link para a **fonte original** (PDF do
 boletim do TCU, notícia da Zênite, acórdão no ViaJuris). Não existe painel.
 
+**Título de cada decisão no boletim:** nunca o título do documento-fonte
+(`itens_brutos.titulo` é da publicação inteira — ex. "TCU Informativo LC
+528/2026" repete pra todas as decisões daquela edição, não identifica uma
+em particular). Montar um título específico por decisão:
+`f"{tribunal} — Acórdão {numero_acordao}"`, com fallback pra
+`numero_processo` quando não houver número de acórdão, seguido de um
+trecho da ementa. Decidido na Etapa 5, antes de `nucleo/boletim.py`
+existir, pra não se perder até a Etapa 7 — ver também
+`DecisaoFatiada.identificador_exibicao` (Etapa 5), que já resolve um
+identificador parecido (número + relator/data) por decisão, usado hoje só
+nas tabelas de log/triagem.
+
 ### Camada 7 — Envio
 
 Gmail SMTP, mesmo padrão do Radar. Credenciais em secrets do GitHub.
@@ -375,6 +387,21 @@ e alguns dias sem e-mail nenhum. É o comportamento esperado, não um defeito.
 **Atraso de publicação.** O Boletim n.º 179/2025 do TCE-PR trata de sessões de
 novembro de 2025. Boletim de jurisprudência não é notícia, é curadoria, e ela
 sai defasada. Quem dá o tempo real é a Zênite.
+
+**Backfill pendente do TCE-MG (edições anteriores à 332).** O HTML do
+informativo do TCE-MG mudou de estrutura ao longo do tempo — pelo menos
+três variantes reais já identificadas (2026-08-07). O fatiador (Etapa 5)
+cobre as duas mais recentes (cabeçalho de seção com âncora vazia, e com
+âncora envolvendo o texto em negrito). Edições anteriores à 332 usam um
+sumário organizado por colegiado ("Tribunal Pleno", "Segunda Câmara") em
+vez de por tribunal, e nem citam a decisão própria no formato "Processo
+<a...>" que as edições recentes usam — cobrir isso exigiria uma terceira
+extração inteira, não coberta agora. Esses itens ficam com
+`itens_brutos.status = 'erro'`, registrados mas sem decisão extraída
+(`fatiar_item` devolvendo lista vazia é tratado como falha, não sucesso
+silencioso). Não afeta a coleta diária, que só processa edições novas no
+formato atual — é só histórico incompleto. Se algum dia fizer sentido ter
+o histórico completo do TCE-MG, é aqui que o trabalho fica pendente.
 
 ---
 

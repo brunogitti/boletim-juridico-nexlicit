@@ -2,5 +2,4 @@ python-dotenv==1.2.2
 pytest==9.1.1
 requests==2.34.2
 pymupdf==1.28.0
-
-# Dependência de LLM (google-genai) entra na Etapa 5.
+google-genai==2.16.0
