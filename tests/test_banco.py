@@ -2,6 +2,7 @@ import pytest
 
 from nucleo.banco import (
     _FONTES_SEED,
+    atualizar_analise,
     conectar,
     criar_schema,
     inserir_decisao,
@@ -119,3 +120,64 @@ def test_seed_fontes_insere_sete_e_e_idempotente(conexao):
         ).fetchall()
     ]
     assert prioridades == [1, 2, 3, 4, 5, 6, 7]
+
+
+def _inserir_decisao_teste(conexao, item_id: int, **overrides) -> int:
+    padrao = dict(
+        item_bruto_id=item_id, chave_dedup="chave-unica-de-teste",
+        tribunal="Zênite", triagem_status="relevante",
+    )
+    padrao.update(overrides)
+    decisao_id = inserir_decisao(conexao, **padrao)
+    conexao.commit()
+    assert decisao_id is not None
+    return decisao_id
+
+
+def test_atualizar_analise_grava_resumo_artigos_impacto(conexao):
+    fonte_id = _inserir_fonte_teste(conexao)
+    item_id = _inserir_item_bruto_teste(conexao, fonte_id)
+    decisao_id = _inserir_decisao_teste(conexao, item_id)
+
+    atualizar_analise(
+        conexao, decisao_id,
+        artigos_lei=["art. 67"], impacto="alto", resumo="Resumo de teste.",
+    )
+    conexao.commit()
+
+    linha = conexao.execute("SELECT * FROM decisoes WHERE id = ?", (decisao_id,)).fetchone()
+    assert linha["impacto"] == "alto"
+    assert linha["resumo"] == "Resumo de teste."
+    assert linha["analisado_em"] is not None
+
+
+def test_atualizar_analise_sem_numero_nao_apaga_valor_existente(conexao):
+    # achado real (2026-08-11): numero_acordao/numero_processo não podem
+    # ser tratados como os outros campos — "não informei" tem que deixar
+    # o valor como está, nunca virar UPDATE ... = NULL por omissão
+    fonte_id = _inserir_fonte_teste(conexao)
+    item_id = _inserir_item_bruto_teste(conexao, fonte_id)
+    decisao_id = _inserir_decisao_teste(conexao, item_id, numero_acordao="123/2026")
+
+    atualizar_analise(conexao, decisao_id, resumo="Resumo sem tocar no número.")
+    conexao.commit()
+
+    linha = conexao.execute("SELECT numero_acordao FROM decisoes WHERE id = ?", (decisao_id,)).fetchone()
+    assert linha["numero_acordao"] == "123/2026"
+
+
+def test_atualizar_analise_com_numero_explicito_atualiza(conexao):
+    fonte_id = _inserir_fonte_teste(conexao)
+    item_id = _inserir_item_bruto_teste(conexao, fonte_id)
+    decisao_id = _inserir_decisao_teste(conexao, item_id)  # numero_acordao None
+
+    atualizar_analise(
+        conexao, decisao_id, numero_acordao="1230/2026", numero_processo="300136/26",
+    )
+    conexao.commit()
+
+    linha = conexao.execute(
+        "SELECT numero_acordao, numero_processo FROM decisoes WHERE id = ?", (decisao_id,),
+    ).fetchone()
+    assert linha["numero_acordao"] == "1230/2026"
+    assert linha["numero_processo"] == "300136/26"

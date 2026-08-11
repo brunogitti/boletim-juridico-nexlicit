@@ -83,13 +83,23 @@ def triar(cliente: ClienteLLM, *, titulo: str, trecho: str) -> ResultadoTriagem:
     return ResultadoTriagem(
         relevante=bool(dados["relevante"]),
         motivo=str(dados["motivo"]),
-        tema=dados.get("tema"),
-        tribunal=dados.get("tribunal"),
-        numero_acordao=dados.get("numero_acordao"),
-        relator=dados.get("relator"),
-        data_julgamento=dados.get("data_julgamento"),
-        impacto_estimado=dados.get("impacto_estimado"),
+        tema=_valor_ou_none(dados.get("tema")),
+        tribunal=_valor_ou_none(dados.get("tribunal")),
+        numero_acordao=_valor_ou_none(dados.get("numero_acordao")),
+        relator=_valor_ou_none(dados.get("relator")),
+        data_julgamento=_valor_ou_none(dados.get("data_julgamento")),
+        impacto_estimado=_valor_ou_none(dados.get("impacto_estimado")),
     )
+
+
+def _valor_ou_none(valor: str | None) -> str | None:
+    """Achado real (2026-08-10): o modelo às vezes devolve a string
+    literal "null" (4 caracteres) pra um campo fora de "required", em vez
+    de simplesmente omitir a chave. Trata isso e string vazia como
+    ausência de valor de verdade."""
+    if valor is None or valor.strip().lower() in ("", "null"):
+        return None
+    return valor
 
 
 _PADRAO_SECAO_SUBSTANTIVA = re.compile(
@@ -123,9 +133,19 @@ def extrair_trecho(texto_decisao: str, *, limite: int = TAMANHO_MAXIMO_TRECHO) -
 def mesclar_metadados(decisao: DecisaoFatiada, resultado: ResultadoTriagem) -> dict:
     """Resolve os campos de metadado entre o que o fatiador já extraiu por
     regex (linha de citação formal — mais confiável) e o que a triagem
-    devolveu. O LLM só é usado onde o fatiador deixou o campo em None de
-    propósito (hoje, só a Zênite); nunca sobrescreve um valor
-    determinístico já extraído.
+    devolveu.
+
+    O gate é por `decisao.tribunal`, não campo a campo. Achado real
+    (2026-08-10): campo a campo, `numero_acordao=None` do TCE-SP e do
+    TCE-MG (decisão própria) — que é o fatiador dizendo com confiança que
+    essa fonte não cita por acórdão, só por processo — virava "faltou
+    preencher", e o LLM enchia com o próprio número de processo (o único
+    número visível no texto), duplicando o valor no campo errado. 63% das
+    decisões relevantes do banco saíram assim. O LLM só é fonte de verdade
+    pra esses 4 campos quando o fatiador não tem *nenhuma* informação
+    estrutural pra decisão inteira — hoje, só a Zênite
+    (`decisao.tribunal is None`). Fora isso, os 4 campos vêm do fatiador
+    tal como estão, mesmo quando algum vier `None` individualmente.
 
     `tribunal` é a única coluna NOT NULL nesse grupo: se nem o fatiador nem
     a triagem conseguirem identificá-lo (notícia da Zênite sem tribunal
@@ -133,9 +153,16 @@ def mesclar_metadados(decisao: DecisaoFatiada, resultado: ResultadoTriagem) -> d
     INSERT — não é um palpite sobre qual tribunal é, só registra
     honestamente que não deu pra saber (decisão combinada antes de
     implementar)."""
+    if decisao.tribunal is None:
+        return {
+            "tribunal": resultado.tribunal or TRIBUNAL_NAO_IDENTIFICADO,
+            "numero_acordao": resultado.numero_acordao,
+            "relator": resultado.relator,
+            "data_julgamento": resultado.data_julgamento,
+        }
     return {
-        "tribunal": decisao.tribunal or resultado.tribunal or TRIBUNAL_NAO_IDENTIFICADO,
-        "numero_acordao": decisao.numero_acordao or resultado.numero_acordao,
-        "relator": decisao.relator or resultado.relator,
-        "data_julgamento": decisao.data_julgamento or resultado.data_julgamento,
+        "tribunal": decisao.tribunal,
+        "numero_acordao": decisao.numero_acordao,
+        "relator": decisao.relator,
+        "data_julgamento": decisao.data_julgamento,
     }

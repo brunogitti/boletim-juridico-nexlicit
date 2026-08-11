@@ -212,6 +212,60 @@ def marcar_decisao_enviada(conexao: sqlite3.Connection,
     )
 
 
+_NAO_INFORMADO = object()  # sentinela: distingue "não passou o argumento"
+# de "passou None de propósito" — usado só por numero_acordao/
+# numero_processo abaixo, os únicos campos que não podem ser apagados por
+# engano quando o chamador simplesmente não tem nada novo pra dizer
+
+
+def atualizar_analise(conexao: sqlite3.Connection, decisao_id: int, *,
+                       artigos_lei: list[str] | None = None,
+                       impacto: str | None = None,
+                       resumo: str | None = None,
+                       triagem_status: str | None = None,
+                       numero_acordao=_NAO_INFORMADO,
+                       numero_processo=_NAO_INFORMADO) -> None:
+    """Grava o resultado da Camada 5 (Etapa 6) numa decisão que já existe
+    (criada pela triagem, Etapa 5). Sempre seta analisado_em = agora,
+    mesmo quando triagem_status vira 'sem_ancora' sem passar pelo LLM —
+    'analisado' aqui quer dizer "a Camada 5 já processou este item", não
+    "o LLM foi chamado". triagem_status só é alterado quando informado
+    (o caminho normal mantém 'relevante'; sem_ancora troca).
+
+    numero_acordao/numero_processo são diferentes: None aqui é um valor
+    válido pros outros campos (limpa o campo), mas pra estes dois um
+    "esqueci de passar" não pode virar um UPDATE que apaga um número já
+    correto — por isso só entram no SET quando o chamador passa
+    explicitamente (mesmo que seja None), via sentinela `_NAO_INFORMADO`
+    como padrão. Uso real: nucleo/analise.py recupera esses dois do
+    rodapé "Serviço" do texto completo quando a triagem devolveu None por
+    causa do teto de 1200 caracteres do trecho — só grava quando achou
+    algo, nunca sobrescreve com None."""
+    campos = ["analisado_em = ?"]
+    valores: list = [_agora_iso()]
+
+    campos.append("artigos_lei = ?")
+    valores.append(json.dumps(artigos_lei) if artigos_lei is not None else None)
+    campos.append("impacto = ?")
+    valores.append(impacto)
+    campos.append("resumo = ?")
+    valores.append(resumo)
+    if triagem_status is not None:
+        campos.append("triagem_status = ?")
+        valores.append(triagem_status)
+    if numero_acordao is not _NAO_INFORMADO:
+        campos.append("numero_acordao = ?")
+        valores.append(numero_acordao)
+    if numero_processo is not _NAO_INFORMADO:
+        campos.append("numero_processo = ?")
+        valores.append(numero_processo)
+
+    valores.append(decisao_id)
+    conexao.execute(
+        f"UPDATE decisoes SET {', '.join(campos)} WHERE id = ?", valores,
+    )
+
+
 def abrir_execucao(conexao: sqlite3.Connection) -> int:
     """Insere uma linha em execucoes com iniciado_em = agora. Devolve o id."""
     cursor = conexao.execute(

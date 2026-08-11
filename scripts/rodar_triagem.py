@@ -37,6 +37,13 @@ LARGURA_MOTIVO = 60
 
 
 def main() -> None:
+    # achado real (scripts/rodar_analise.py): print() redirecionado no
+    # Windows cai no codepage padrão (cp1252), que não cobre boa parte do
+    # que o LLM pode devolver em motivo/tema — UnicodeEncodeError derruba
+    # a rodada inteira já processada
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     load_dotenv()
     configurar_logging()
 

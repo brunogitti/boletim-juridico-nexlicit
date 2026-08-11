@@ -80,6 +80,19 @@ def test_triar_le_todos_os_campos_quando_presentes():
     assert resultado.impacto_estimado == "medio"
 
 
+def test_triar_trata_string_null_literal_como_ausencia():
+    # achado real (2026-08-10): o modelo às vezes devolve a string "null"
+    # (4 caracteres) pra um campo fora de "required", em vez de omitir a
+    # chave — 2 registros no banco saíram assim antes desse fix
+    cliente = _ClienteFalso({
+        "relevante": True, "motivo": "x", "tribunal": "null", "numero_acordao": "",
+    })
+    resultado = triar(cliente, titulo="x", trecho="y")
+
+    assert resultado.tribunal is None
+    assert resultado.numero_acordao is None
+
+
 # --- extrair_trecho() --------------------------------------------------------
 
 def test_extrair_trecho_pega_so_o_primeiro_paragrafo():
@@ -188,3 +201,29 @@ def test_mesclar_metadados_sem_tribunal_em_nenhuma_fonte_usa_sentinela():
     metadados = mesclar_metadados(decisao, resultado)
 
     assert metadados["tribunal"] == TRIBUNAL_NAO_IDENTIFICADO
+
+
+def test_mesclar_metadados_nao_deixa_llm_preencher_campo_isolado():
+    # achado real (2026-08-10): TCE-SP e TCE-MG-própria têm tribunal
+    # identificado pelo fatiador mas nunca citam por acórdão — antes, o
+    # gate era campo a campo, e o LLM "preenchia" numero_acordao com o
+    # próprio numero_processo (o único número visível no texto), porque
+    # o fatiador tinha deixado só ESSE campo em None. 63% das decisões
+    # relevantes do banco saíram com numero_acordao == numero_processo
+    # por causa disso. O gate certo é por decisão inteira (tribunal),
+    # não por campo: se o fatiador já identificou o tribunal, nenhum dos
+    # 4 campos pode vir do LLM, nem os que ele deixou None de propósito.
+    decisao = _decisao_fatiada(
+        tribunal="TCE-SP", numero_acordao=None, numero_processo="012834.989.25-3",
+        relator="Conselheiro Fulano", data_julgamento="2026-03-11",
+    )
+    resultado = ResultadoTriagem(
+        relevante=True, motivo="x", tema=None, tribunal="TCE-SP",
+        numero_acordao="012834.989.25-3",  # LLM "inventando" a partir do processo
+        relator="Conselheiro Fulano", data_julgamento="2026-03-11",
+        impacto_estimado=None,
+    )
+
+    metadados = mesclar_metadados(decisao, resultado)
+
+    assert metadados["numero_acordao"] is None

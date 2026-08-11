@@ -78,7 +78,7 @@ def fatiar_item(
     if nome_fonte.startswith("TCE-PR"):
         return _fatiar_tce_pr(item_bruto_id, texto_bruto)
     if nome_fonte == "Zênite":
-        return _fatiar_zenite(item_bruto_id, texto_bruto)
+        return _fatiar_zenite(item_bruto_id, texto_bruto, url_origem)
     raise ValueError(f"fonte desconhecida pro fatiador: {nome_fonte!r}")
 
 
@@ -459,7 +459,14 @@ def _fatiar_tcu(item_bruto_id: int, texto_bruto: str, url_origem: str) -> list[D
 
 # --- Zênite (já atômico na coleta; sem extração de metadados) -------------
 
-def _fatiar_zenite(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]:
+def _fatiar_zenite(item_bruto_id: int, texto_bruto: str, url_origem: str) -> list[DecisaoFatiada]:
+    # achado real (2026-08-10): diferente de tribunal/acórdão/relator (que
+    # exigem extrair algo do texto livre, com risco real de inventar),
+    # url_inteiro_teor não precisa ser extraído — url_origem já é a fonte
+    # original de verdade pra uma notícia da Zênite. Deixar None aqui
+    # tirava a Zênite inteira do e-mail pra sempre (regra de âncora,
+    # Camada 5), sem necessidade — mesma lógica que STJ já usa quando uma
+    # nota não tem link próprio (cai pra URL da edição).
     return [DecisaoFatiada(
         item_bruto_id=item_bruto_id,
         tribunal=None,
@@ -468,7 +475,7 @@ def _fatiar_zenite(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
         orgao_julgador=None,
         relator=None,
         data_julgamento=None,
-        url_inteiro_teor=None,
+        url_inteiro_teor=url_origem,
         texto_decisao=texto_bruto,
     )]
 

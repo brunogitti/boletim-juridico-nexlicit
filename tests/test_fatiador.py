@@ -302,7 +302,10 @@ def test_fatiar_zenite_usa_fixture_real(monkeypatch):
 
     assert decisao.tribunal is None
     assert decisao.numero_acordao is None
-    assert decisao.url_inteiro_teor is None
+    # achado real: url_inteiro_teor não precisa ser extraído do texto (ao
+    # contrário de tribunal/acórdão/relator) — url_origem já é a fonte
+    # original de verdade, não usar isso tirava a Zênite do e-mail sempre
+    assert decisao.url_inteiro_teor == itens[0].url_origem
     assert decisao.texto_decisao == itens[0].texto_bruto
 
 
