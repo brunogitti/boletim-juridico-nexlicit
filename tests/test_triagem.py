@@ -63,7 +63,8 @@ def test_triar_aceita_resposta_so_com_campos_obrigatorios():
 
     assert resultado == ResultadoTriagem(
         relevante=False, motivo="trata só de pessoal", tema=None, tribunal=None,
-        numero_acordao=None, relator=None, data_julgamento=None, impacto_estimado=None,
+        numero_acordao=None, numero_identificador=None, relator=None,
+        data_julgamento=None, impacto_estimado=None,
     )
 
 
@@ -78,6 +79,21 @@ def test_triar_le_todos_os_campos_quando_presentes():
 
     assert resultado.tema == "qualificacao_tecnica"
     assert resultado.impacto_estimado == "medio"
+
+
+def test_triar_le_numero_identificador_de_edital():
+    # achado real (2026-08-11): notícia da Zênite sobre licitação em
+    # andamento cita o número do próprio instrumento (Concorrência/Pregão/
+    # Edital/Resolução), não um acórdão — o schema tem um campo próprio
+    # pra isso, separado de numero_acordao
+    cliente = _ClienteFalso({
+        "relevante": True, "motivo": "suspensão cautelar de licitação",
+        "numero_identificador": "Concorrência Presencial n. 05/2026",
+    })
+    resultado = triar(cliente, titulo="x", trecho="y")
+
+    assert resultado.numero_identificador == "Concorrência Presencial n. 05/2026"
+    assert resultado.numero_acordao is None
 
 
 def test_triar_trata_string_null_literal_como_ausencia():
@@ -159,14 +175,15 @@ def test_mesclar_metadados_fatiador_tem_precedencia():
     )
     resultado = ResultadoTriagem(
         relevante=True, motivo="x", tema=None, tribunal="TCU",
-        numero_acordao="9999/2099", relator="OUTRO NOME", data_julgamento="2099-01-01",
+        numero_acordao="9999/2099", numero_identificador=None,
+        relator="OUTRO NOME", data_julgamento="2099-01-01",
         impacto_estimado=None,
     )
 
     metadados = mesclar_metadados(decisao, resultado)
 
     assert metadados == {
-        "tribunal": "TCE-PR", "numero_acordao": "3190/2025",
+        "tribunal": "TCE-PR", "numero_acordao": "3190/2025", "numero_processo": None,
         "relator": "THIAGO BARBOSA CORDEIRO", "data_julgamento": "2025-11-10",
     }
 
@@ -176,16 +193,37 @@ def test_mesclar_metadados_usa_triagem_quando_fatiador_deixa_null():
     decisao = _decisao_fatiada()
     resultado = ResultadoTriagem(
         relevante=True, motivo="x", tema="dispensa", tribunal="TCE-SP",
-        numero_acordao="123/2026", relator="FULANA", data_julgamento="2026-01-05",
+        numero_acordao="123/2026", numero_identificador=None,
+        relator="FULANA", data_julgamento="2026-01-05",
         impacto_estimado="alto",
     )
 
     metadados = mesclar_metadados(decisao, resultado)
 
     assert metadados == {
-        "tribunal": "TCE-SP", "numero_acordao": "123/2026",
+        "tribunal": "TCE-SP", "numero_acordao": "123/2026", "numero_processo": None,
         "relator": "FULANA", "data_julgamento": "2026-01-05",
     }
+
+
+def test_mesclar_metadados_usa_numero_identificador_como_numero_processo():
+    # achado real (2026-08-11): notícia da Zênite sobre licitação em
+    # andamento — fatiador não identifica tribunal (Zênite), e a triagem
+    # não tem acórdão pra reportar, só o número do edital/Concorrência.
+    # Esse valor reaproveita o slot numero_processo, o mesmo padrão já
+    # usado pro número de súmula do TCE-SP em numero_acordao.
+    decisao = _decisao_fatiada()
+    resultado = ResultadoTriagem(
+        relevante=True, motivo="suspensão cautelar de licitação",
+        tema="dispensa", tribunal=None, numero_acordao=None,
+        numero_identificador="Concorrência Presencial n. 05/2026",
+        relator=None, data_julgamento=None, impacto_estimado="medio",
+    )
+
+    metadados = mesclar_metadados(decisao, resultado)
+
+    assert metadados["numero_acordao"] is None
+    assert metadados["numero_processo"] == "Concorrência Presencial n. 05/2026"
 
 
 def test_mesclar_metadados_sem_tribunal_em_nenhuma_fonte_usa_sentinela():
@@ -194,8 +232,8 @@ def test_mesclar_metadados_sem_tribunal_em_nenhuma_fonte_usa_sentinela():
     decisao = _decisao_fatiada()
     resultado = ResultadoTriagem(
         relevante=False, motivo="tendência geral, sem tribunal específico",
-        tema=None, tribunal=None, numero_acordao=None, relator=None,
-        data_julgamento=None, impacto_estimado=None,
+        tema=None, tribunal=None, numero_acordao=None, numero_identificador=None,
+        relator=None, data_julgamento=None, impacto_estimado=None,
     )
 
     metadados = mesclar_metadados(decisao, resultado)
@@ -220,6 +258,7 @@ def test_mesclar_metadados_nao_deixa_llm_preencher_campo_isolado():
     resultado = ResultadoTriagem(
         relevante=True, motivo="x", tema=None, tribunal="TCE-SP",
         numero_acordao="012834.989.25-3",  # LLM "inventando" a partir do processo
+        numero_identificador=None,
         relator="Conselheiro Fulano", data_julgamento="2026-03-11",
         impacto_estimado=None,
     )
@@ -227,3 +266,7 @@ def test_mesclar_metadados_nao_deixa_llm_preencher_campo_isolado():
     metadados = mesclar_metadados(decisao, resultado)
 
     assert metadados["numero_acordao"] is None
+    # regressão: numero_processo vem do fatiador (passthrough), nunca de
+    # resultado.numero_identificador — esse campo só é fonte de verdade
+    # quando decisao.tribunal is None (Zênite), ver teste acima
+    assert metadados["numero_processo"] == "012834.989.25-3"

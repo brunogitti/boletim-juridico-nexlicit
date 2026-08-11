@@ -31,9 +31,17 @@ extração.**
 
 ## Regras que não se negociam
 
-- **Nenhuma decisão entra no e-mail sem número de acórdão E link para a fonte
-  original.** Sem âncora, o item vai para `triagem_status = 'sem_ancora'` e fica
-  registrado, mas não é enviado.
+- **Nenhuma decisão entra no e-mail sem identificador citável E link para a
+  fonte original.** Sem âncora, o item vai para `triagem_status = 'sem_ancora'`
+  e fica registrado, mas não é enviado. "Identificador citável" é número de
+  acórdão, número de processo, ou — só quando a notícia é sobre licitação
+  ainda em andamento, sem decisão julgada — o número do próprio instrumento
+  (Concorrência, Pregão, Edital, Resolução). Essa ampliação existe porque a
+  maioria das fontes reais nunca cita por acórdão (só por processo), e uma
+  notícia de licitação em curso não tem acórdão nenhum pra citar mesmo
+  quando é genuinamente relevante — exigir só acórdão excluiria a maior
+  parte do boletim do que ele deveria cobrir. Falta de QUALQUER um dos dois
+  (identificador ou link) barra o item, não só a falta dos dois juntos.
 - **O LLM não pode afirmar que um entendimento é novo, inédito ou que muda
   jurisprudência anterior.** Não existe base histórica para sustentar isso.
   Se a própria fonte afirmar, pode reproduzir atribuindo à fonte.

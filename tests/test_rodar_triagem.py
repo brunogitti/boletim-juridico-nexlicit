@@ -94,7 +94,8 @@ def _decisao_fatiada(**overrides) -> DecisaoFatiada:
 def _resultado_triagem(**overrides) -> ResultadoTriagem:
     padrao = dict(
         relevante=True, motivo="motivo qualquer", tema=None, tribunal=None,
-        numero_acordao=None, relator=None, data_julgamento=None, impacto_estimado=None,
+        numero_acordao=None, numero_identificador=None, relator=None,
+        data_julgamento=None, impacto_estimado=None,
     )
     padrao.update(overrides)
     return ResultadoTriagem(**padrao)

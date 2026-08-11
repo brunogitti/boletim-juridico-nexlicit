@@ -85,14 +85,23 @@ def analisar(cliente: ClienteLLM, *, titulo: str, texto_completo: str) -> Result
 def tem_ancora(*, numero_acordao: str | None, numero_processo: str | None,
                 url_inteiro_teor: str | None) -> bool:
     """Regra não-negociável (CLAUDE.md): "nenhuma decisão entra no e-mail
-    sem número de acórdão E link para a fonte original" — os dois são
+    sem identificador citável E link para a fonte original" — os dois são
     exigidos, falta de qualquer um dos dois barra o item.
 
-    "Número" aqui é acórdão OU processo, o que a fonte usar pra se citar
-    (achado real: TCE-SP, STJ e TCE-MG decisão própria nunca têm número
-    de acórdão, só de processo — são 63% das decisões relevantes já no
-    banco; exigir acórdão ao pé da letra excluiria a maioria do boletim,
-    o que não é a intenção da regra).
+    "Identificador" aqui é numero_acordao OU numero_processo, o que a
+    fonte usar pra se citar (achado real: TCE-SP, STJ e TCE-MG decisão
+    própria nunca têm número de acórdão, só de processo — são 63% das
+    decisões relevantes já no banco; exigir acórdão ao pé da letra
+    excluiria a maioria do boletim, o que não é a intenção da regra).
+
+    `numero_processo` também reaproveita esse mesmo slot pra número de
+    edital/Concorrência/Pregão/Resolução (achado real 2026-08-11):
+    notícia da Zênite sobre licitação em andamento, sem acórdão julgado
+    ainda, mas que cita o número do próprio instrumento — é um
+    identificador citável tão válido quanto acórdão ou processo, e sem
+    ele a notícia ficaria sem_ancora mesmo linkando pra fonte original.
+    A função em si não muda: o valor já chega mesclado em numero_processo
+    por `nucleo.triagem.mesclar_metadados`.
 
     Sem essas duas informações, `triagem_status` vira 'sem_ancora' — fica
     registrado, mas não entra no e-mail."""

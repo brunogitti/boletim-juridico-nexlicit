@@ -142,7 +142,7 @@ def _processar_item(conexao, cliente, item) -> tuple[list[str], int, int]:
         chave = calcular_chave_dedup(
             tribunal=metadados["tribunal"],
             numero_acordao=metadados["numero_acordao"],
-            numero_processo=decisao.numero_processo,
+            numero_processo=metadados["numero_processo"],
             data_julgamento=metadados["data_julgamento"],
             titulo_item_bruto=item["titulo"] or "",
             data_publicacao_item_bruto=item["data_publicacao"],
@@ -160,7 +160,7 @@ def _processar_item(conexao, cliente, item) -> tuple[list[str], int, int]:
                 chave_dedup=chave,
                 tribunal=metadados["tribunal"],
                 numero_acordao=metadados["numero_acordao"],
-                numero_processo=decisao.numero_processo,
+                numero_processo=metadados["numero_processo"],
                 orgao_julgador=decisao.orgao_julgador,
                 relator=metadados["relator"],
                 data_julgamento=metadados["data_julgamento"],

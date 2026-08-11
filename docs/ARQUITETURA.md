@@ -169,6 +169,13 @@ Na dúvida entre relevante e não relevante, marque como NÃO relevante.
 
 Extraia apenas o que estiver LITERALMENTE no texto. Campo ausente = null.
 Nunca invente número de acórdão, relator ou data.
+
+Se o texto citar um número de acórdão de verdade (decisão já julgada),
+preencha numero_acordao. Se for notícia sobre licitação ainda em
+andamento (sem decisão julgada), sem número de acórdão, mas citar o
+número do próprio instrumento — Concorrência, Pregão, Edital, Resolução
+— preencha numero_identificador com esse número, e deixe numero_acordao
+null. Nunca preencha os dois com o mesmo valor.
 ```
 
 **Schema de saída:**
@@ -180,11 +187,21 @@ Nunca invente número de acórdão, relator ou data.
   "tema": "qualificacao_tecnica",
   "tribunal": "TCE-PR",
   "numero_acordao": "3190/2025",
+  "numero_identificador": null,
   "relator": "THIAGO BARBOSA CORDEIRO",
   "data_julgamento": "2025-11-10",
   "impacto_estimado": "medio"
 }
 ```
+
+`numero_identificador` existe pra cobrir notícia de licitação em
+andamento (achado real 2026-08-11, fonte Zênite): sem acórdão julgado
+ainda, o único identificador citável do caso é o número do próprio
+instrumento — Concorrência, Pregão, Edital, Resolução. Esse valor é
+gravado na mesma coluna `numero_processo` de `decisoes` (ver Camada 6 e
+`nucleo/triagem.mesclar_metadados` — mesmo padrão de reaproveitamento já
+usado pro número de súmula do TCE-SP em `numero_acordao`; não existe
+coluna `numero_edital` própria).
 
 ### Camada 5 — Análise (estágio 2)
 
@@ -209,8 +226,21 @@ Seis campos, todos ancorados no texto. Nada além disso na fase 1.
   fase 1. Se o próprio texto da fonte disser que é mudança de entendimento, você
   pode reproduzir isso citando que a fonte afirma.
 - Proibido citar artigo de lei que não apareça no texto.
-- Se não houver número de acórdão nem link, o item **não entra no e-mail**.
+- **Se não houver identificador citável E link, o item não entra no e-mail.**
   Vai para a tabela com status `sem_ancora` e fica registrado para revisão.
+  "E" é literal: falta de qualquer um dos dois barra o item, não só a falta
+  dos dois juntos (achado real: citações de TCU embutidas no informativo do
+  TCE-MG têm número de acórdão mas nenhum link — barradas mesmo tendo
+  número). "Identificador citável" é número de acórdão OU de processo — o
+  que a fonte usar pra se citar (TCE-SP, STJ e TCE-MG decisão própria nunca
+  citam por acórdão, só por processo; são a maioria das decisões relevantes
+  do banco, e exigir acórdão ao pé da letra excluiria quase todo o
+  boletim) — OU, quando a notícia é sobre licitação em andamento sem
+  decisão julgada ainda, o número do próprio instrumento (Concorrência,
+  Pregão, Edital, Resolução — achado real 2026-08-11, fonte Zênite: sem
+  essa ampliação, notícia relevante sobre licitação em curso ficaria
+  sem_ancora só por não existir acórdão pra citar, mesmo linkando pra fonte
+  original e citando o número do próprio processo licitatório).
 
 ### Camada 6 — Boletim
 

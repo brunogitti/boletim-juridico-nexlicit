@@ -39,6 +39,13 @@ Na dúvida entre relevante e não relevante, marque como NÃO relevante.
 
 Extraia apenas o que estiver LITERALMENTE no texto. Campo ausente = null.
 Nunca invente número de acórdão, relator ou data.
+
+Se o texto citar um número de acórdão de verdade (decisão já julgada),
+preencha numero_acordao. Se for notícia sobre licitação ainda em
+andamento (sem decisão julgada), sem número de acórdão, mas citar o
+número do próprio instrumento — Concorrência, Pregão, Edital, Resolução
+— preencha numero_identificador com esse número, e deixe numero_acordao
+null. Nunca preencha os dois com o mesmo valor.
 """
 
 # Só "relevante" e "motivo" são obrigatórios. Os demais ficam de fora de
@@ -54,6 +61,7 @@ SCHEMA_TRIAGEM = {
         "tema": {"type": "string"},
         "tribunal": {"type": "string"},
         "numero_acordao": {"type": "string"},
+        "numero_identificador": {"type": "string"},
         "relator": {"type": "string"},
         "data_julgamento": {"type": "string"},
         "impacto_estimado": {"type": "string", "enum": ["alto", "medio", "baixo"]},
@@ -69,6 +77,8 @@ class ResultadoTriagem:
     tema: str | None
     tribunal: str | None
     numero_acordao: str | None
+    numero_identificador: str | None  # Concorrência/Pregão/Edital/Resolução —
+    # licitação em andamento, sem acórdão julgado ainda (achado real 2026-08-11)
     relator: str | None
     data_julgamento: str | None
     impacto_estimado: str | None
@@ -86,6 +96,7 @@ def triar(cliente: ClienteLLM, *, titulo: str, trecho: str) -> ResultadoTriagem:
         tema=_valor_ou_none(dados.get("tema")),
         tribunal=_valor_ou_none(dados.get("tribunal")),
         numero_acordao=_valor_ou_none(dados.get("numero_acordao")),
+        numero_identificador=_valor_ou_none(dados.get("numero_identificador")),
         relator=_valor_ou_none(dados.get("relator")),
         data_julgamento=_valor_ou_none(dados.get("data_julgamento")),
         impacto_estimado=_valor_ou_none(dados.get("impacto_estimado")),
@@ -142,10 +153,20 @@ def mesclar_metadados(decisao: DecisaoFatiada, resultado: ResultadoTriagem) -> d
     preencher", e o LLM enchia com o próprio número de processo (o único
     número visível no texto), duplicando o valor no campo errado. 63% das
     decisões relevantes do banco saíram assim. O LLM só é fonte de verdade
-    pra esses 4 campos quando o fatiador não tem *nenhuma* informação
+    pra esses campos quando o fatiador não tem *nenhuma* informação
     estrutural pra decisão inteira — hoje, só a Zênite
-    (`decisao.tribunal is None`). Fora isso, os 4 campos vêm do fatiador
+    (`decisao.tribunal is None`). Fora isso, os campos vêm do fatiador
     tal como estão, mesmo quando algum vier `None` individualmente.
+
+    `numero_processo` reaproveita a coluna existente pra também guardar
+    número de edital/Concorrência/Pregão/Resolução (achado real
+    2026-08-11: notícia da Zênite sobre licitação em andamento, sem
+    acórdão julgado, cita o número do próprio instrumento logo no primeiro
+    parágrafo — dentro do trecho de 1200 caracteres da triagem, então não
+    precisa do fallback de texto completo). Mesmo padrão já usado pro
+    número de súmula do TCE-SP reaproveitando `numero_acordao` — não cria
+    coluna nova pra isso, `tem_ancora()` (nucleo/analise.py) já aceita
+    qualquer coisa em `numero_processo` como identificador válido.
 
     `tribunal` é a única coluna NOT NULL nesse grupo: se nem o fatiador nem
     a triagem conseguirem identificá-lo (notícia da Zênite sem tribunal
@@ -157,12 +178,14 @@ def mesclar_metadados(decisao: DecisaoFatiada, resultado: ResultadoTriagem) -> d
         return {
             "tribunal": resultado.tribunal or TRIBUNAL_NAO_IDENTIFICADO,
             "numero_acordao": resultado.numero_acordao,
+            "numero_processo": resultado.numero_identificador,
             "relator": resultado.relator,
             "data_julgamento": resultado.data_julgamento,
         }
     return {
         "tribunal": decisao.tribunal,
         "numero_acordao": decisao.numero_acordao,
+        "numero_processo": decisao.numero_processo,
         "relator": decisao.relator,
         "data_julgamento": decisao.data_julgamento,
     }
