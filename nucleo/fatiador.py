@@ -142,6 +142,16 @@ def _fatiar_tce_pr(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
 # "Processo <a...>" nessas edições. Não cobrimos essa variante agora;
 # esses itens ficam com status='erro' (fatiar_item devolve lista vazia,
 # rodar_triagem.py trata isso como falha, não como sucesso silencioso).
+#
+# Achado real (2026-08-10, lendo a tabela de descartes da triagem): até
+# aqui, texto_decisao de TCE-MG era só a linha de citação (~100
+# caracteres) — nem a citação própria nem a de outro tribunal carregam o
+# parágrafo que descreve o caso de verdade. Esse parágrafo existe na
+# página (confirmado olhando a fonte real), antes da citação, mas nunca
+# era capturado. O separador visual "* * * * * *" marca o início de cada
+# item de verdade (inclusive descartando o metadado de busca — "ATENÇÃO:
+# ...", "Palavras-chave: ...", "Processos relacionados: ..." — que sobra
+# no fim do item anterior e não pode vazar pro início do próximo).
 
 _MAPEAMENTO_TRIBUNAL_TCE_MG = {
     "tribunal de contas do estado de minas gerais": "TCE-MG",
@@ -170,13 +180,29 @@ _PADRAO_TCE_MG_OUTRO_TRIBUNAL = re.compile(
     r"<b>Acórdão(?:</b>\s*<b>)?\s*(\d+/\d+)\s*([^<]+?)</b>\s*\([^,]+,\s*Relator\s*"
     r"(?:Ministro|Ministra)\s*([^)]+)\)"
 )
+_PADRAO_SEPARADOR_ITEM_TCE_MG = re.compile(r"\*\s+\*\s+\*\s+\*\s+\*\s+\*")
+
+
+def _fatiar_com_contexto(segmento: str, padrao_citacao: re.Pattern):
+    """Pra cada citação, devolve (match, bloco) onde bloco é o texto desde
+    o separador visual "* * * * * *" mais próximo antes da citação (ou do
+    início do segmento, se não houver separador antes) até o fim da
+    própria citação. É nesse trecho — antes da citação, não nela — que
+    mora a descrição real do caso."""
+    limites = [0] + [m.end() for m in _PADRAO_SEPARADOR_ITEM_TCE_MG.finditer(segmento)]
+    resultado = []
+    for m in padrao_citacao.finditer(segmento):
+        candidatos = [limite for limite in limites if limite <= m.start()]
+        inicio = max(candidatos) if candidatos else 0
+        resultado.append((m, segmento[inicio:m.end()]))
+    return resultado
 
 
 def _fatiar_tce_mg(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]:
     decisoes = []
     for tribunal, segmento in _dividir_por_secao_tce_mg(texto_bruto):
         if tribunal == "TCE-MG":
-            for m in _PADRAO_TCE_MG_PROPRIO.finditer(segmento):
+            for m, bloco in _fatiar_com_contexto(segmento, _PADRAO_TCE_MG_PROPRIO):
                 url, numero_processo, orgao, data, relator = m.groups()
                 numero_processo = numero_processo.strip()
                 relator = _normalizar_espacos(relator)
@@ -190,14 +216,14 @@ def _fatiar_tce_mg(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
                     relator=relator,
                     data_julgamento=data_iso,
                     url_inteiro_teor=html.unescape(url),
-                    texto_decisao=_texto_puro(m.group(0)),
+                    texto_decisao=_texto_puro(bloco),
                     identificador_exibicao=_identificador_padrao(
                         numero_acordao=None, numero_processo=numero_processo,
                         relator=relator, data_julgamento=data_iso,
                     ),
                 ))
         else:
-            for m in _PADRAO_TCE_MG_OUTRO_TRIBUNAL.finditer(segmento):
+            for m, bloco in _fatiar_com_contexto(segmento, _PADRAO_TCE_MG_OUTRO_TRIBUNAL):
                 numero_acordao, orgao, relator = m.groups()
                 relator = _normalizar_espacos(relator)
                 decisoes.append(DecisaoFatiada(
@@ -209,7 +235,7 @@ def _fatiar_tce_mg(item_bruto_id: int, texto_bruto: str) -> list[DecisaoFatiada]
                     relator=relator,
                     data_julgamento=None,  # não informado nesse formato
                     url_inteiro_teor=None,  # achado real: sem link nesses trechos
-                    texto_decisao=_texto_puro(m.group(0)),
+                    texto_decisao=_texto_puro(bloco),
                     identificador_exibicao=_identificador_padrao(
                         numero_acordao=numero_acordao, numero_processo=None,
                         relator=relator, data_julgamento=None,

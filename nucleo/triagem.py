@@ -5,6 +5,7 @@ Roda sobre título + primeiro parágrafo (ementa), não o texto inteiro — isso
 schema são os de docs/ARQUITETURA.md, reproduzidos literalmente.
 """
 
+import re
 from dataclasses import dataclass
 
 from nucleo.fatiador import DecisaoFatiada
@@ -91,11 +92,32 @@ def triar(cliente: ClienteLLM, *, titulo: str, trecho: str) -> ResultadoTriagem:
     )
 
 
+_PADRAO_SECAO_SUBSTANTIVA = re.compile(
+    r"\n\n(?:Ementa|Tema):\s*\n?(.*?)(?=\n\n|\Z)", re.DOTALL,
+)
+
+
 def extrair_trecho(texto_decisao: str, *, limite: int = TAMANHO_MAXIMO_TRECHO) -> str:
-    """Primeiro parágrafo do texto (o "título + ementa" que a Camada 4
-    pede), cortado num teto de caracteres por segurança de custo."""
-    primeiro_paragrafo = texto_decisao.split("\n\n", 1)[0].strip()
-    return primeiro_paragrafo[:limite]
+    """Título + ementa (o que a Camada 4 pede), cortado num teto de
+    caracteres por segurança de custo.
+
+    Achado real (2026-08-07): pra TCU e STJ, o "primeiro parágrafo" (texto
+    até o primeiro '\\n\\n') é só o título — a Citação/Ementa real do TCU e
+    o Tema real do STJ vêm em parágrafos seguintes, e com esse texto a
+    triagem nunca via conteúdo nenhum pra avaliar (100% descartado nas
+    duas fontes, todo motivo dizendo "só tem o título"). Quando existe uma
+    seção rotulada "Ementa:" ou "Tema:", ela entra depois do título. Fontes
+    sem esse rótulo (TCE-PR, TCE-SP, TCE-MG, Zênite) continuam no
+    comportamento antigo — pegar o primeiro parágrafo inteiro, sem regressão."""
+    titulo = texto_decisao.split("\n\n", 1)[0].strip()
+
+    m = _PADRAO_SECAO_SUBSTANTIVA.search(texto_decisao)
+    if m:
+        trecho = f"{titulo}\n\n{m.group(1).strip()}"
+    else:
+        trecho = titulo
+
+    return trecho[:limite]
 
 
 def mesclar_metadados(decisao: DecisaoFatiada, resultado: ResultadoTriagem) -> dict:

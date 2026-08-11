@@ -101,6 +101,12 @@ def test_fatiar_tce_mg_variante_1_ancora_vazia_usa_fixture_real():
     assert primeira.identificador_exibicao == (
         "Processo 1152957 — Rel. Conselheiro Alencar da Silveira Jr."
     )
+    # regressão: texto_decisao não pode ser só a linha de citação (~100
+    # caracteres) — o parágrafo de "Destaque" que descreve o caso de
+    # verdade tem que estar junto (achado real, 2026-08-10)
+    assert len(primeira.texto_decisao) > 1000
+    assert "Johny Claudy Fernandes" in primeira.texto_decisao
+    assert "Município de Caratinga" in primeira.texto_decisao
 
     por_numero = {d.numero_acordao: d for d in outras}
 
@@ -110,6 +116,7 @@ def test_fatiar_tce_mg_variante_1_ancora_vazia_usa_fixture_real():
     assert normal.relator == "Benjamin Zymler"
     assert normal.url_inteiro_teor is None  # achado real: sem link nesse trecho
     assert normal.identificador_exibicao == "Acórdão 2507/2026 — Rel. Benjamin Zymler"
+    assert "aferição da proporcionalidade da multa" in normal.texto_decisao
 
     # achado real: "Acórdão" e "N/AAAA Órgão" em duas tags <b> separadas
     # (resíduo de exportação do Word) — mesma edição, formato diferente
@@ -117,6 +124,7 @@ def test_fatiar_tce_mg_variante_1_ancora_vazia_usa_fixture_real():
     assert com_b_separado.orgao_julgador == "Plenário"
     assert com_b_separado.relator == "Jhonatan de Jesus"
     assert com_b_separado.identificador_exibicao == "Acórdão 1370/2026 — Rel. Jhonatan de Jesus"
+    assert "Minha Casa Minha Vida" in com_b_separado.texto_decisao
 
 
 def test_fatiar_tce_mg_variante_2_ancora_envolve_texto_usa_fixture_real():
@@ -136,6 +144,8 @@ def test_fatiar_tce_mg_variante_2_ancora_envolve_texto_usa_fixture_real():
     assert {d.tribunal for d in outras} == {"TCU"}
     assert all(d.numero_processo is not None for d in proprias)
     assert all(d.numero_acordao is not None for d in outras)
+    # regressão: nenhuma decisão pode ficar só com a linha de citação
+    assert all(len(d.texto_decisao) > 300 for d in decisoes)
 
 
 def test_dividir_por_secao_tce_mg_ignora_cabecalho_generico_sem_trocar_tribunal():

@@ -2,6 +2,11 @@
 custaria quota e não seria reprodutível), regra de precedência de
 metadados e corte de trecho."""
 
+from pathlib import Path
+
+import coletores.stj as stj
+import coletores.tcu as tcu
+import nucleo.fatiador as fatiador
 from nucleo.fatiador import DecisaoFatiada
 from nucleo.llm import ClienteLLM
 from nucleo.triagem import (
@@ -11,6 +16,8 @@ from nucleo.triagem import (
     mesclar_metadados,
     triar,
 )
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class _ClienteFalso(ClienteLLM):
@@ -83,6 +90,49 @@ def test_extrair_trecho_pega_so_o_primeiro_paragrafo():
 def test_extrair_trecho_respeita_teto_de_caracteres():
     texto = "a" * 2000
     assert len(extrair_trecho(texto, limite=100)) == 100
+
+
+def test_extrair_trecho_sem_rotulo_mantem_comportamento_antigo():
+    # TCE-PR/TCE-SP/TCE-MG/Zênite não têm seção "Ementa:"/"Tema:" rotulada
+    # — não pode regredir pra elas por causa do fix do TCU/STJ
+    texto = "Acórdão n.º 3190/2025, Primeira Câmara, Rel. FULANO, julgado em 10/11/2025"
+    assert extrair_trecho(texto) == texto
+
+
+def test_extrair_trecho_tcu_pega_ementa_de_verdade_usando_fixture_real():
+    # achado real (2026-08-10, lendo a tabela de descartes): sem esse fix,
+    # TCU tinha 100% de descarte — a triagem só via o título repetindo a
+    # citação, nunca a Ementa. Usa o mesmo fixture real da Etapa 4/5.
+    import csv
+    import io
+
+    texto_csv = (FIXTURES / "tcu" / "boletim-informativo-lc.csv").read_text(encoding="utf-8-sig")
+    leitor = csv.DictReader(io.StringIO(texto_csv), delimiter="|")
+    linha = next(l for l in leitor if l["TEXTOACORDAO"].strip())
+    item = tcu._montar_item(linha, "TCU Informativo LC")
+    decisao = fatiador._fatiar_tcu(1, item.texto_bruto, item.url_origem)[0]
+
+    trecho = extrair_trecho(decisao.texto_decisao)
+
+    assert "Ementa:" not in trecho  # o rótulo em si não precisa sobrar
+    assert "afronta o art. 59" in trecho  # conteúdo real da ementa
+    assert "Detalhamento" not in trecho  # isso é trabalho da Camada 5, não da 4
+
+
+def test_extrair_trecho_stj_pega_tema_de_verdade_usando_fixture_real():
+    edicao = stj.EdicaoFeed(
+        numero="0887", data_publicacao="2026-05-05T03:00:00+00:00", url="https://x/887",
+    )
+    html_texto = (FIXTURES / "stj" / "edicao_887.html").read_text(encoding="utf-8")
+    itens = stj._extrair_notas_administrativas(html_texto, edicao)
+    decisao = fatiador._fatiar_stj(
+        1, itens[0].texto_bruto, itens[0].url_origem, itens[0].data_publicacao,
+    )[0]
+
+    trecho = extrair_trecho(decisao.texto_decisao)
+
+    assert "Tema:" not in trecho
+    assert len(trecho) > len(decisao.texto_decisao.split("\n\n", 1)[0])
 
 
 # --- mesclar_metadados() ------------------------------------------------------
