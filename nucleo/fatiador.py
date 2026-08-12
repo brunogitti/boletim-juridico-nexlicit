@@ -275,7 +275,16 @@ _PADRAO_ORGAO_TCE_SP = re.compile(
 )
 _PADRAO_CITACAO_TCE_SP = re.compile(
     r"([^\n]+?)\s*\n\(Sess[ãa]o(?: Plen[áa]ria)? de (\d{1,2}/\d{1,2}/\d{4})\.\s*"
-    r"(?:Relatoria|Redatoria)[^:]*:\s*([^)]+)\)"
+    # achado real (2026-08-12, decisões 456/479): o PDF do TCE-SP às vezes
+    # grafa "Relatoria Nome)" sem dois-pontos (a maioria usa "Relatoria:
+    # Nome)"). Com [^:]* + ":" obrigatório, a falta do ":" fazia o regex
+    # pular pro ":" da PRÓXIMA citação, engolindo ementa inteira + Nota
+    # CPAJ + links + número de processo seguinte como "relator". ":"
+    # agora é opcional; [^:)\n]*? (preguiçoso, sem cruzar ")" nem quebra
+    # de linha) impede esse vazamento mesmo sem o ":" — sem isso, o grupo
+    # do nome capturaria só o último caractere antes do ")" por causa da
+    # disputa entre os dois grupos gulosos.
+    r"(?:Relatoria|Redatoria)[^:)\n]*?:?\s*([^)]+)\)"
 )
 _PADRAO_LINK_INTEIRO_TEOR_TCE_SP = re.compile(
     r"--- links de inteiro teor desta página ---\n(https://\S+)"

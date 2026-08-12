@@ -202,6 +202,42 @@ def test_remover_linhas_com_pontilhado_preserva_citacao_quebrada_em_duas_linhas(
     assert resultado.strip() == "CONTEÚDO REAL COMEÇA AQUI"
 
 
+def test_fatiar_tce_sp_boletim_relatoria_sem_dois_pontos_nao_vaza_pra_proxima_citacao():
+    # achado real (2026-08-12, decisões 456/479 no banco): o PDF do
+    # TCE-SP às vezes grafa "Relatoria Nome)" sem ":" (a maioria usa
+    # "Relatoria: Nome)"). O regex antigo exigia ":" e, na ausência dele,
+    # pulava pro ":" da PRÓXIMA citação — o relator armazenado virava a
+    # ementa inteira + Nota CPAJ + links + processo seguinte (~1440
+    # caracteres). Texto abaixo é um recorte real do item_bruto_id=62
+    # (trecho de origem da decisão id=456), sem o corpo integral da
+    # ementa/nota, só o suficiente pra reproduzir a estrutura de verdade:
+    # duas citações consecutivas, a primeira sem ":", a segunda com.
+    texto_bruto = (
+        "SEÇÃO\n"
+        "000001.989.23-5 e outro \n"
+        "(Sessão de 03/02/2026. Relatoria Conselheiro Marco Aurélio Bertaiolli) \n"
+        " \n"
+        "EMENTA: INEXIGIBILIDADE DE LICITAÇÃO. INVIABILIDADE DE COMPETIÇÃO NÃO "
+        "CARACTERIZADA.\n"
+        "Nota CPAJ: texto qualquer de nota.\n\n"
+        "--- links de inteiro teor desta página ---\n"
+        "https://jurisprudencia.tce.sp.gov.br/arqs_juri/pdf/2/1/2/967212.pdf\n\n"
+        "005461.989.23-8 \n"
+        "(Sessão de 10/03/2026. Relatoria: Conselheiro Wagner de Campos Rosário) \n"
+        "EMENTA: outra decisão, conteúdo qualquer.\n"
+    )
+    decisoes = fatiador._fatiar_tce_sp_boletim(item_bruto_id=1, texto_bruto=texto_bruto)
+
+    primeira, segunda = decisoes
+    assert primeira.numero_processo == "000001.989.23-5 e outro"
+    assert primeira.relator == "Conselheiro Marco Aurélio Bertaiolli"
+    assert "EMENTA" not in primeira.relator
+    assert "005461" not in primeira.relator  # não pode vazar pro processo seguinte
+
+    assert segunda.numero_processo == "005461.989.23-8"
+    assert segunda.relator == "Conselheiro Wagner de Campos Rosário"
+
+
 # --- STJ: já atômico, só extrai metadados ---------------------------------
 
 def test_fatiar_stj_usa_fixture_real():
