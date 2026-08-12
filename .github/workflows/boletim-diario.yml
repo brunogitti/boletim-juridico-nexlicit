@@ -1,0 +1,114 @@
+name: Boletim diário
+
+on:
+  schedule:
+    - cron: '37 9 * * *'  # 06:37 BRT — UTC-3 fixo, Brasil sem horário de verão
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # push na branch `data`
+
+env:
+  DATABASE_PATH: boletim.db
+
+jobs:
+  boletim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v7
+
+      - name: Configurar Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Restaurar banco da branch data (se existir)
+        run: |
+          git fetch origin data --depth=1 2>/dev/null || true
+          if git ls-remote --exit-code --heads origin data > /dev/null 2>&1; then
+            git show origin/data:boletim.db > boletim.db
+            echo "banco restaurado da branch data"
+          else
+            echo "branch data ainda não existe — começando com banco novo"
+          fi
+
+      - name: Coleta (Camada 1)
+        id: coleta
+        continue-on-error: true
+        run: python -m scripts.coletar_tudo
+
+      - name: Fatiamento + dedup + triagem (Camadas 2-4)
+        id: triagem
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m scripts.rodar_triagem --reprocessar-erros
+
+      - name: Análise (Camada 5)
+        id: analise
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m scripts.rodar_analise
+
+      - name: Boletim + envio (Camadas 6-7)
+        id: boletim
+        continue-on-error: true
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+        run: python -m scripts.rodar_boletim
+
+      - name: Persistir banco na branch data
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin data --depth=1 2>/dev/null || true
+          if git ls-remote --exit-code --heads origin data > /dev/null 2>&1; then
+            git checkout -B data origin/data
+          else
+            git checkout --orphan data
+            git rm -rf . > /dev/null 2>&1 || true
+          fi
+          git add -f boletim.db
+          git commit -m "chore: atualiza banco — $(date -u +%Y-%m-%dT%H:%M:%SZ)" --allow-empty
+          git push origin data
+          git checkout master
+
+      - name: Notificar falha por e-mail
+        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure'
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_DESTINATARIO: ${{ secrets.EMAIL_DESTINATARIO }}
+        run: |
+          python -c "
+          import os
+          from datetime import datetime, timedelta, timezone
+          from nucleo.envio import enviar_email
+          # data em BRT (UTC-3 fixo, mesma convenção do resto do projeto) —
+          # assunto reconhecível na caixa de entrada sem precisar abrir
+          data_brt = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime('%d/%m')
+          assunto = f'[Boletim NexLicit] Falha na execução de {data_brt}'
+          corpo = (
+              '<p>O job diário do Boletim Jurídico NexLicit teve pelo menos '
+              'uma etapa com falha. Confira os logs no GitHub Actions.</p>'
+          )
+          enviar_email(
+              os.environ['EMAIL_DESTINATARIO'],
+              assunto,
+              corpo,
+              usuario=os.environ['GMAIL_USER'],
+              senha_app=os.environ['GMAIL_APP_PASSWORD'],
+          )
+          "
+
+      - name: Marcar job como falho
+        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure'
+        run: exit 1
