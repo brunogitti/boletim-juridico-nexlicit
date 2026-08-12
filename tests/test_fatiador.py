@@ -247,6 +247,31 @@ def test_fatiar_tcu_usa_fixture_real():
     assert decisao.identificador_exibicao == "Acórdão 2357/2026 — Rel. Bruno Dantas"
 
 
+def test_fatiar_tcu_data_julgamento_e_none_de_verdade_quando_ausente_da_fonte():
+    # achado real (2026-08-12): 7 decisões do TCU no banco tinham
+    # data_julgamento com a string-placeholder "null" ou "(ausente)" em
+    # vez de None de verdade, quebrando visualmente o boletim ("— null").
+    # Investiguei _fatiar_tcu (código atual e todo o histórico via git
+    # log -p): a função sempre grava data_julgamento=None, sem nenhum
+    # caminho de extração — a string-placeholder não vinha daqui.
+    # Confirmando contra a fonte real: as colunas do CSV de dados abertos
+    # do TCU (KEY, TITULO, COLEGIADO, TEXTOACORDAO, ENUNCIADO, NUMERO,
+    # TEXTOINFO) não têm campo de data nenhum — não há o que extrair.
+    # Este teste trava que o comportamento correto (None, não uma string)
+    # continue valendo pra qualquer citação real do TCU.
+    texto_csv = (FIXTURES / "tcu" / "boletim-informativo-lc.csv").read_text(encoding="utf-8-sig")
+    leitor = csv.DictReader(io.StringIO(texto_csv), delimiter="|")
+    linhas = [linha for linha in leitor if linha["TEXTOACORDAO"].strip()]
+
+    for linha in linhas:
+        item = tcu._montar_item(linha, "TCU Informativo LC")
+        decisao = fatiador._fatiar_tcu(1, item.texto_bruto, item.url_origem)[0]
+
+        assert decisao.data_julgamento is None
+        assert decisao.data_julgamento != "null"
+        assert decisao.data_julgamento != "(ausente)"
+
+
 def test_fatiar_tcu_nao_confunde_titulo_com_citacao():
     # regressão do bug real achado no smoke test: o título já repete
     # "Acórdão N/AAAA ÓRGÃO" antes da linha "Citação:" — sem a âncora
