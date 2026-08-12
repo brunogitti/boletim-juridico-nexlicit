@@ -1,3 +1,5 @@
+# Versões de action confirmadas em 2026-08-12 (release mais recente na
+# época): actions/checkout@v7, actions/setup-python@v7.
 name: Boletim diário
 
 on:
