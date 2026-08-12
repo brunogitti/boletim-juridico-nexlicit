@@ -164,6 +164,11 @@ NÃO é relevante se tratar apenas de: pessoal, aposentadoria, pensão, concurso
 público, contas de governo, obrigações do gestor sem reflexo para o licitante,
 prescrição de sanção a gestor, improbidade, ou processos internos do tribunal.
 
+Notícia institucional sobre lançamento de ferramenta, disponibilização de
+material de apoio, ou anúncio de funcionalidade NÃO é decisão nem
+entendimento jurídico, mesmo que mencione a Lei 14.133/2021 ou algum tema
+da lista de relevância acima — marque como NÃO relevante.
+
 Na dúvida entre relevante e não relevante, marque como NÃO relevante.
 É melhor perder uma decisão do que poluir o boletim.
 
