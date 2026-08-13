@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import random
+import re
 import time
 from abc import ABC, abstractmethod
 
@@ -131,3 +132,29 @@ def criar_cliente_llm() -> ClienteLLM:
 
     modelo = os.environ.get("GEMINI_MODEL") or MODELO_PADRAO
     return ClienteGeminiFlash(chave_api=chave_api, modelo=modelo)
+
+
+# Achado real: o modelo às vezes devolve uma string-placeholder pra um
+# campo opcional em vez de simplesmente omitir a chave — e cada rodada
+# inventa uma variante diferente da mesma ideia ("null" em 2026-08-10,
+# "__NULL__" em 2026-08-13; "(ausente)" apareceu numa decisão sem se
+# confirmar como vindo do pipeline). Em vez de colecionar strings exatas
+# uma a uma, casa qualquer coisa que seja só pontuação/sublinhado em
+# volta de uma palavra-símbolo de ausência conhecida.
+_PADRAO_VALOR_NULO = re.compile(
+    r"^[_\-\s()]*(null|none|n/?a|ausente|indispon[íi]vel)[_\-\s()]*$", re.IGNORECASE,
+)
+
+
+def valor_ou_none(valor: str | None) -> str | None:
+    """Trata string vazia ou placeholder de ausência (ver _PADRAO_VALOR_NULO)
+    como None de verdade. Compartilhado entre triagem e análise — mesmo
+    tipo de saída de LLM (JSON com campo opcional fora de "required"),
+    mesmo tratamento, pra não duplicar nem deixar um dos dois sem a
+    proteção quando o modelo inventa mais uma variante."""
+    if valor is None:
+        return None
+    limpo = valor.strip()
+    if limpo == "" or _PADRAO_VALOR_NULO.match(limpo):
+        return None
+    return valor

@@ -107,6 +107,45 @@ def test_gerar_json_resposta_vazia_levanta_erro_llm(monkeypatch):
         cliente.gerar_json(instrucoes="i", entrada="e", schema={})
 
 
+# --- valor_ou_none() ---------------------------------------------------------
+
+def test_valor_ou_none_passa_valor_real_sem_tocar():
+    assert llm.valor_ou_none("Conselheiro Fulano de Tal") == "Conselheiro Fulano de Tal"
+
+
+def test_valor_ou_none_none_continua_none():
+    assert llm.valor_ou_none(None) is None
+
+
+def test_valor_ou_none_string_vazia_vira_none():
+    assert llm.valor_ou_none("   ") is None
+
+
+@pytest.mark.parametrize("placeholder", [
+    "null", "NULL", "Null",
+    "__NULL__",  # achado real (2026-08-13): decisão do TCE/SC no boletim
+    # mostrou "Acórdão __NULL__" e "Rel. __NULL__" — numero_acordao,
+    # numero_processo e relator vieram todos com essa string do LLM
+    "none", "None",
+    "n/a", "N/A", "na",
+    "ausente", "(ausente)", "Ausente",
+    "indisponível", "indisponivel",
+])
+def test_valor_ou_none_reconhece_variantes_de_placeholder(placeholder):
+    # achado real: o modelo já inventou 3 variantes diferentes da mesma
+    # ideia ("null", "(ausente)", "__NULL__") em rodadas distintas — em
+    # vez de colecionar string exata por string exata, o padrão casa
+    # qualquer pontuação/sublinhado em volta de uma palavra-símbolo
+    # conhecida de ausência
+    assert llm.valor_ou_none(placeholder) is None
+
+
+def test_valor_ou_none_nao_falso_positivo_em_nome_real_com_na():
+    # "na" sozinho é placeholder, mas não pode confundir um nome real que
+    # contenha esses caracteres como substring
+    assert llm.valor_ou_none("Conselheira Ana Paula") == "Conselheira Ana Paula"
+
+
 # --- criar_cliente_llm() ------------------------------------------------------
 
 def test_criar_cliente_llm_falta_api_key(monkeypatch):

@@ -7,7 +7,7 @@ proibições de docs/ARQUITETURA.md literalmente.
 import re
 from dataclasses import dataclass
 
-from nucleo.llm import ClienteLLM
+from nucleo.llm import ClienteLLM, valor_ou_none
 
 INSTRUCOES_ANALISE = """\
 Você recebe o texto completo de uma decisão de tribunal de contas ou
@@ -73,12 +73,12 @@ def analisar(cliente: ClienteLLM, *, titulo: str, texto_completo: str) -> Result
     )
     artigos = dados.get("artigos_lei")
     return ResultadoAnalise(
-        o_que_foi_decidido=dados.get("o_que_foi_decidido"),
+        o_que_foi_decidido=valor_ou_none(dados.get("o_que_foi_decidido")),
         artigos_lei=list(artigos) if artigos else None,
-        impacto_pratico=dados.get("impacto_pratico"),
-        mudanca_procedimento=dados.get("mudanca_procedimento"),
-        impacto=dados.get("impacto"),
-        resumo=dados.get("resumo"),
+        impacto_pratico=valor_ou_none(dados.get("impacto_pratico")),
+        mudanca_procedimento=valor_ou_none(dados.get("mudanca_procedimento")),
+        impacto=valor_ou_none(dados.get("impacto")),
+        resumo=valor_ou_none(dados.get("resumo")),
     )
 
 

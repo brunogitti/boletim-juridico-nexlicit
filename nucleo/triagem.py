@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass
 
 from nucleo.fatiador import DecisaoFatiada
-from nucleo.llm import ClienteLLM
+from nucleo.llm import ClienteLLM, valor_ou_none
 
 TRIBUNAL_NAO_IDENTIFICADO = "Não identificado"
 
@@ -104,24 +104,14 @@ def triar(cliente: ClienteLLM, *, titulo: str, trecho: str) -> ResultadoTriagem:
     return ResultadoTriagem(
         relevante=bool(dados["relevante"]),
         motivo=str(dados["motivo"]),
-        tema=_valor_ou_none(dados.get("tema")),
-        tribunal=_valor_ou_none(dados.get("tribunal")),
-        numero_acordao=_valor_ou_none(dados.get("numero_acordao")),
-        numero_identificador=_valor_ou_none(dados.get("numero_identificador")),
-        relator=_valor_ou_none(dados.get("relator")),
-        data_julgamento=_valor_ou_none(dados.get("data_julgamento")),
-        impacto_estimado=_valor_ou_none(dados.get("impacto_estimado")),
+        tema=valor_ou_none(dados.get("tema")),
+        tribunal=valor_ou_none(dados.get("tribunal")),
+        numero_acordao=valor_ou_none(dados.get("numero_acordao")),
+        numero_identificador=valor_ou_none(dados.get("numero_identificador")),
+        relator=valor_ou_none(dados.get("relator")),
+        data_julgamento=valor_ou_none(dados.get("data_julgamento")),
+        impacto_estimado=valor_ou_none(dados.get("impacto_estimado")),
     )
-
-
-def _valor_ou_none(valor: str | None) -> str | None:
-    """Achado real (2026-08-10): o modelo às vezes devolve a string
-    literal "null" (4 caracteres) pra um campo fora de "required", em vez
-    de simplesmente omitir a chave. Trata isso e string vazia como
-    ausência de valor de verdade."""
-    if valor is None or valor.strip().lower() in ("", "null"):
-        return None
-    return valor
 
 
 _PADRAO_SECAO_SUBSTANTIVA = re.compile(
