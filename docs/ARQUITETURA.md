@@ -444,6 +444,26 @@ silencioso). Não afeta a coleta diária, que só processa edições novas no
 formato atual — é só histórico incompleto. Se algum dia fizer sentido ter
 o histórico completo do TCE-MG, é aqui que o trabalho fica pendente.
 
+**STJ falha a partir do GitHub Actions (Cloudflare, IP de datacenter).**
+O coletor do STJ devolve 403 quando roda no runner do GitHub Actions,
+mas funciona normalmente de IP residencial (confirmado, 2026-08-13:
+mesma requisição, mesmo User-Agent, 200 OK local vs. 403 no CI).
+Investigado contra evidência real — não é o mesmo bug de acento no
+User-Agent já corrigido em outras fontes (TCE-PR, Zênite): o header
+`cf-mitigated: challenge` e o corpo da resposta ("Verificação
+automática em andamento", script `_cf_chl_opt` com `cType:
+'interactive'`) confirmam que é um **JS Challenge interativo** do
+Cloudflare — mecanismo que `requests`/`curl` não resolvem estruturalmente,
+não importa o header enviado. O Cloudflare do STJ está identificando a
+faixa de IP do Azure (usada pelos runners do GitHub Actions) como
+tráfego de datacenter e desafiando por esse motivo, não pelo conteúdo
+da requisição. Falha isolada — não derruba o resto do pipeline (mesmo
+design de "todo coletor falha isolado" já vigente). Três caminhos
+possíveis, nenhum aplicado ainda: aceitar a lacuna (comportamento
+atual — 5 das 6 fontes seguem funcionando no CI), rodar a coleta do
+STJ separadamente de uma máquina residencial, ou usar proxy residencial
+pago (fora do escopo "tudo em free tier"). Decisão em aberto.
+
 ---
 
 ## 7. O que fica para a fase 3
