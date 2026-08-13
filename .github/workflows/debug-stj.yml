@@ -15,5 +15,7 @@ jobs:
           curl -s -D - -o body.html \
             -A "BoletimJuridicoNexLicit/0.1 (uso pessoal e nao comercial; ver docs/ARQUITETURA.md)" \
             -L "https://ww2.stj.jus.br/jurisprudencia/externo/InformativoFeed"
-          echo "=== CORPO (primeiros 2000 chars) ==="
-          head -c 2000 body.html
+          echo "=== CORPO, sem a linha do SVG em base64 (que é gigante) ==="
+          grep -v "data:image" body.html
+          echo "=== texto legível, sem tags HTML ==="
+          sed 's/<[^>]*>/ /g' body.html | grep -v "data:image" | tr -s ' \n' ' \n'
