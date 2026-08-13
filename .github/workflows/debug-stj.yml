@@ -1,0 +1,19 @@
+name: Debug STJ 403 (temporário)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: IP público do runner
+        run: curl -s https://api.ipify.org; echo
+
+      - name: curl verboso contra o feed do STJ (mesmo UA do coletor)
+        run: |
+          curl -s -D - -o body.html \
+            -A "BoletimJuridicoNexLicit/0.1 (uso pessoal e nao comercial; ver docs/ARQUITETURA.md)" \
+            -L "https://ww2.stj.jus.br/jurisprudencia/externo/InformativoFeed"
+          echo "=== CORPO (primeiros 2000 chars) ==="
+          head -c 2000 body.html
