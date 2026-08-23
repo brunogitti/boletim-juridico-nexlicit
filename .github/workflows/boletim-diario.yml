@@ -37,6 +37,7 @@ jobs:
           else
             echo "branch data ainda não existe — começando com banco novo"
           fi
+          echo "HASH_BANCO_ANTES=$(sha256sum boletim.db 2>/dev/null | cut -d' ' -f1)" >> "$GITHUB_ENV"
 
       - name: Coleta (Camada 1)
         id: coleta
@@ -67,24 +68,61 @@ jobs:
         run: python -m scripts.rodar_boletim
 
       - name: Persistir banco na branch data
+        id: persistir
         if: always()
         run: |
+          HASH_BANCO_DEPOIS=$(sha256sum boletim.db 2>/dev/null | cut -d' ' -f1)
+          echo "hash antes do pipeline:  $HASH_BANCO_ANTES"
+          echo "hash depois do pipeline: $HASH_BANCO_DEPOIS"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin data --depth=1 2>/dev/null || true
+
+          # branch data isolada num worktree separado -- a working tree
+          # principal (onde nucleo/scripts vivem) nunca troca de branch.
+          # Achado real (2026-08-22): checkout -B sobrescrevia
+          # silenciosamente o boletim.db recém-modificado (porque *.db é
+          # gitignored no master, e checkout não protege arquivo ignorado
+          # contra sobrescrita) — 9 dias de commits vazios sem ninguém
+          # perceber, mascarados por --allow-empty. checkout -B também
+          # apagava nucleo/scripts da working tree (não existem na branch
+          # data), o que quebraria o step de notificação de falha se o
+          # push falhasse antes do "checkout master" final rodar.
           if git ls-remote --exit-code --heads origin data > /dev/null 2>&1; then
-            git checkout -B data origin/data
+            git worktree add "$RUNNER_TEMP/data-branch" data
           else
-            git checkout --orphan data
-            git rm -rf . > /dev/null 2>&1 || true
+            git worktree add --orphan -b data "$RUNNER_TEMP/data-branch"
           fi
+
+          cp boletim.db "$RUNNER_TEMP/data-branch/boletim.db"
+          cd "$RUNNER_TEMP/data-branch"
           git add -f boletim.db
-          git commit -m "chore: atualiza banco — $(date -u +%Y-%m-%dT%H:%M:%SZ)" --allow-empty
-          git push origin data
-          git checkout master
+
+          if git diff --cached --quiet -- boletim.db; then
+            if [ "$HASH_BANCO_ANTES" != "$HASH_BANCO_DEPOIS" ]; then
+              # o pipeline mudou o arquivo local (hash mudou) mas não há
+              # nada a persistir contra a branch data -- exatamente a
+              # assinatura do bug de 13 a 21/08. Falha o job de
+              # propósito: melhor alerta vermelho do que outros 9 dias
+              # mudos. Sem continue-on-error neste step, de propósito.
+              echo "::error::pipeline modificou boletim.db mas não há diferença a persistir na branch data -- possível regressão do bug de isolamento do checkout. Investigar antes do próximo run."
+              cd "$GITHUB_WORKSPACE"
+              git worktree remove "$RUNNER_TEMP/data-branch" --force
+              exit 1
+            fi
+            echo "banco sem mudança hoje (nada novo processado) -- pulando commit"
+          else
+            git commit -q -m "chore: atualiza banco — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push origin data
+            echo "banco persistido na branch data"
+          fi
+
+          cd "$GITHUB_WORKSPACE"
+          git worktree remove "$RUNNER_TEMP/data-branch" --force
 
       - name: Notificar falha por e-mail
-        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure'
+        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure' || steps.persistir.outcome == 'failure'
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
@@ -112,5 +150,5 @@ jobs:
           "
 
       - name: Marcar job como falho
-        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure'
+        if: steps.coleta.outcome == 'failure' || steps.triagem.outcome == 'failure' || steps.analise.outcome == 'failure' || steps.boletim.outcome == 'failure' || steps.persistir.outcome == 'failure'
         run: exit 1
