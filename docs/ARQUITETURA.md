@@ -464,6 +464,34 @@ atual — 5 das 6 fontes seguem funcionando no CI), rodar a coleta do
 STJ separadamente de uma máquina residencial, ou usar proxy residencial
 pago (fora do escopo "tudo em free tier"). Decisão em aberto.
 
+**Incidente: banco congelado silenciosamente por 9 dias (12–21/08/2026).**
+O step "Persistir banco na branch data" do workflow usava `git checkout
+-B data origin/data` na mesma working tree onde o pipeline acabara de
+modificar `boletim.db`. Como `*.db` é gitignored no `master`, o
+`checkout` sobrescreveu o arquivo recém-modificado com a versão antiga
+da branch `data` **sem erro nenhum** — git não protege arquivo ignorado
+contra sobrescrita, só protege untracked não ignorado. O commit
+seguinte ficava idêntico ao anterior todo dia, e só não aparecia como
+falha por causa do `--allow-empty`. Resultado: os 9 e-mails diários
+desse período saíram de verdade (coleta, triagem, análise e envio
+funcionando), mas cada run reiniciava do mesmo snapshot de 12/08 —
+**79% das decisões enviadas nesses 9 dias eram repetidas** (108 de 136
+decisões distintas apareceram em 2+ e-mails; 14 delas saíram nos 9
+e-mails seguidos, um por dia). Um segundo bug relacionado foi achado e
+evitado antes de virar incidente à parte: o mesmo `checkout -B` também
+apagava `nucleo/`, `scripts/` etc. da working tree (não existem na
+branch `data`) — se o `git push` tivesse falhado antes do `checkout
+master` final, o próprio step de notificação de falha por e-mail
+quebraria (`ModuleNotFoundError`) bem na hora de avisar que algo deu
+errado. Corrigido isolando a branch `data` num `git worktree` separado
+— a working tree principal nunca troca de branch, eliminando as duas
+causas por construção — e trocando o `--allow-empty` por uma
+verificação explícita de hash do banco antes/depois do pipeline: se o
+arquivo mudou mas não há nada a persistir contra a branch `data`, o job
+falha de propósito (sem `continue-on-error` nesse step) em vez de
+mascarar. Validado em produção via `workflow_dispatch` comparando o SHA
+do blob antes e depois, não só o resumo verde do job.
+
 ---
 
 ## 7. O que fica para a fase 3
